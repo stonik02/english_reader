@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package reader.v1;
+
+option go_package = "github.com/deniskrylov/english-reader/backend/gen/reader/v1;readerv1";
+
+service VocabularyService {
+  rpc SaveEntry(SaveEntryRequest) returns (SaveEntryResponse);
+  rpc ListEntries(ListEntriesRequest) returns (ListEntriesResponse);
+  rpc DeleteEntry(DeleteEntryRequest) returns (DeleteEntryResponse);
+  rpc GetHighlights(GetHighlightsRequest) returns (GetHighlightsResponse);
+}
+
+message VocabularySense {
+  int64 id = 1;
+  string part_of_speech = 2;
+  repeated string translations = 3;
+  string example_en = 4;
+  string example_ru = 5;
+}
+
+message VocabularyEntry {
+  string id = 1;
+  int64 lemma_id = 2;
+  string lemma = 3;
+  string source_form = 4;
+  VocabularySense chosen_sense = 5;
+  string created_at = 6;
+  string updated_at = 7;
+}
+
+message SaveEntryRequest {
+  string access_token = 1;
+  int64 lemma_id = 2;
+  optional int64 chosen_sense_id = 3;
+  string source_form = 4;
+}
+
+message SaveEntryResponse {
+  VocabularyEntry entry = 1;
+  bool already_saved = 2;
+}
+
+message ListEntriesRequest {
+  string access_token = 1;
+  string cursor = 2;
+  int32 limit = 3;
+  string query = 4;
+}
+
+message ListEntriesResponse {
+  repeated VocabularyEntry entries = 1;
+  string next_cursor = 2;
+}
+
+message DeleteEntryRequest {
+  string access_token = 1;
+  oneof target {
+    string entry_id = 2;
+    int64 lemma_id = 3;
+  }
+}
+
+message DeleteEntryResponse {}
+
+message GetHighlightsRequest {
+  string access_token = 1;
+  string book_id = 2;
+  string chapter_id = 3;
+}
+
+message HighlightToken {
+  int64 lemma_id = 1;
+  string lemma = 2;
+  repeated int32 positions = 3;
+  enum MatchKind {
+    MATCH_KIND_UNSPECIFIED = 0;
+    MATCH_KIND_LEMMA = 1;
+    MATCH_KIND_EXACT_FALLBACK = 2;
+  }
+  MatchKind match_kind = 4;
+  repeated string texts = 5;
+}
+
+message GetHighlightsResponse {
+  repeated HighlightToken tokens = 1;
+}

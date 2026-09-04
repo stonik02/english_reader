@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS dictionary_import_runs;
+DROP TABLE IF EXISTS translation_cache;
+DROP TABLE IF EXISTS vocabulary_entries;
+DROP TABLE IF EXISTS dictionary_senses;
+DROP TABLE IF EXISTS dictionary_lemmas;
+DROP TABLE IF EXISTS user_reader_settings;
+DROP TABLE IF EXISTS reading_progress;
+DROP TABLE IF EXISTS user_books;
+DROP TABLE IF EXISTS book_chapters;
+DROP TABLE IF EXISTS ingestion_jobs;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS auth_sessions;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS book_add_source;
+DROP TYPE IF EXISTS book_status;
+DROP EXTENSION IF EXISTS citext;

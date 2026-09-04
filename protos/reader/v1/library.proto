@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package reader.v1;
+
+option go_package = "github.com/deniskrylov/english-reader/backend/gen/reader/v1;readerv1";
+
+import "reader/v1/auth.proto";
+
+service LibraryService {
+  rpc UploadBook(stream UploadBookRequest) returns (Book);
+  rpc ListCatalog(ListCatalogRequest) returns (BookPage);
+  rpc GetBook(GetBookRequest) returns (Book);
+  rpc AddToMyLibrary(AddToMyLibraryRequest) returns (UserBook);
+  rpc ListMyBooks(ListMyBooksRequest) returns (UserBookPage);
+  rpc RemoveFromMyLibrary(RemoveFromMyLibraryRequest) returns (Empty);
+  rpc DeleteBook(DeleteBookRequest) returns (Empty);
+}
+
+message UploadBookMetadata {
+  string access_token = 1;
+  string filename = 2;
+}
+
+message UploadBookRequest {
+  oneof payload {
+    UploadBookMetadata metadata = 1;
+    bytes chunk = 2;
+  }
+}
+
+message Book {
+  string id = 1;
+  string title = 2;
+  string author = 3;
+  // One of: processing, ready, failed. Values are always lowercase.
+  string status = 4;
+  string uploaded_by_user_id = 5;
+  string created_at = 6;
+  string cover_url = 7;
+}
+
+message UserBook {
+  Book book = 1;
+  string added_at = 2;
+  string added_via = 3;
+  double progress_percent = 4;
+}
+
+message BookPage { repeated Book books = 1; string next_cursor = 2; }
+message UserBookPage { repeated UserBook books = 1; string next_cursor = 2; }
+message ListCatalogRequest { string access_token = 1; string cursor = 2; int32 limit = 3; }
+message GetBookRequest { string access_token = 1; string book_id = 2; }
+message AddToMyLibraryRequest { string access_token = 1; string book_id = 2; }
+message ListMyBooksRequest { string access_token = 1; string cursor = 2; int32 limit = 3; }
+message RemoveFromMyLibraryRequest { string access_token = 1; string book_id = 2; }
+message DeleteBookRequest { string access_token = 1; string book_id = 2; }

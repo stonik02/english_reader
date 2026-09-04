@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package reader.v1;
+
+option go_package = "github.com/deniskrylov/english-reader/backend/gen/reader/v1;readerv1";
+
+service DictionaryService {
+  rpc LookupWord(LookupWordRequest) returns (LookupWordResponse);
+}
+
+message LookupWordRequest {
+  string access_token = 1;
+  string book_id = 2;
+  string chapter_id = 3;
+  string selected_text = 4;
+  string sentence_text = 5;
+  string epub_cfi = 6;
+  string source_language = 7;
+}
+
+message DictionarySense {
+  int64 id = 1;
+  string part_of_speech = 2;
+  repeated string translations = 3;
+  string example_en = 4;
+  string example_ru = 5;
+  string source_url = 6;
+  string attribution = 7;
+}
+
+message SentenceTranslation {
+  oneof result {
+    string translated_text = 1;
+    string provider_error = 2;
+  }
+}
+
+message SourceMetadata {
+  string source = 1;
+  string source_version = 2;
+}
+
+message LookupWordResponse {
+  string normalized_lemma = 1;
+  repeated DictionarySense senses = 2;
+  SentenceTranslation sentence_translation = 3;
+  bool context_verified = 4;
+  SourceMetadata source = 5;
+  bool already_saved = 6;
+  int64 lemma_id = 7;
+}

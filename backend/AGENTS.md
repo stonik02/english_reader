@@ -24,6 +24,154 @@ lastUpdated: "2025-06-16"
 
 This comprehensive guide outlines best practices for developing scalable microservices using Go with Clean Architecture principles, OpenTelemetry observability, and modern backend development practices. The guide emphasizes idiomatic Go code, modular design, comprehensive testing, and robust observability across distributed systems.
 
+## Mandatory Request Architecture for This Project
+
+The generic examples below are subordinate to this section. Every new business
+request must follow this direction:
+
+```text
+handler → request-specific usecase → optional reusable service → repository
+```
+
+### Rules
+
+1. **One request, one handler file and package.** A handler is created for each
+   HTTP or gRPC request. It validates/binds transport input, obtains identity
+   from transport metadata, calls exactly its corresponding usecase, maps errors
+   to HTTP/gRPC responses, and writes the response. A handler never calls a
+   repository directly.
+2. **One handler, one dedicated usecase package.** Each handler receives a
+   separate usecase in its own package, even when neighbouring requests look
+   similar. The usecase contains the request-specific application flow,
+   authorization rule, transaction boundary and orchestration.
+3. **Services are optional.** Introduce a service only when logic is genuinely
+   reused by two or more usecases (for example password hashing, token issuance,
+   EPUB parsing or translation-provider access). A usecase may skip this layer
+   and call its repository directly when no reusable logic exists.
+4. **Repositories are separate packages.** A repository owns persistence and
+   external storage access only. It does not know HTTP, gRPC, handlers, usecases
+   or response DTOs.
+5. **No layer merging.** Handlers, usecases, services and repositories must be
+   different Go packages. Do not create a catch-all `auth`, `transport` or
+   `usecase` package containing multiple request handlers/usecases.
+6. **Dependencies point to the right.** A handler imports its paired usecase;
+   a usecase imports a service/repository dependency; a service imports its own
+   dependencies; a repository imports database/client packages. The composition
+   root (`cmd/server`) is the only place that wires concrete implementations.
+7. **Interfaces live at the consumer boundary.** The package that uses a
+   dependency declares the smallest interface it needs and accepts that
+   interface in its constructor. Never define an interface next to an
+   implementation merely so the implementation can return it.
+8. **Use `dependencies.go` for dependency interfaces.** Every usecase package
+   and every service package must contain a dedicated `dependencies.go` file for
+   interfaces of its dependencies. If a handler needs a dependency abstraction,
+   it also declares it in that handler package's `dependencies.go`.
+9. **Constructors return concrete types.** A usecase, service or repository
+   constructor returns its own concrete pointer: `*UseCase`, `*Service` or
+   `*Repository`. The consuming package declares and receives the interface,
+   never the producing package.
+
+### Required directory shape
+
+Use feature and request names in singular snake-free Go directory names. The
+following is an example for `POST /auth/register`; HTTP and gRPC handlers may
+share the same usecase if they expose the same application request.
+
+```text
+internal/
+  handler/
+    http/
+      auth/
+        register/
+          handler.go             # package register
+    grpc/
+      auth/
+        register/
+          handler.go             # package register
+  usecase/
+    auth/
+      register/
+        usecase.go               # package register
+        dependencies.go          # interfaces consumed by this usecase
+        usecase_test.go
+  service/                       # optional; only shared logic
+    password/
+      service.go                 # package password
+      dependencies.go            # interfaces consumed by this service
+    token/
+      service.go                 # package token
+      dependencies.go            # interfaces consumed by this service
+  repository/
+    postgres/
+      user/
+        repository.go            # package user
+        repository_test.go
+```
+
+For `POST /auth/login`, create sibling packages `handler/.../login` and
+`usecase/.../login`; do not add login logic to the register package. Shared
+password/token code belongs to its service package. The same pattern applies to
+every library, reader, translator and vocabulary request.
+
+### Dependency-interface example
+
+The usecase owns the interface because it consumes the repository; the concrete
+repository never returns a repository interface:
+
+```go
+// internal/usecase/auth/register/dependencies.go
+package register
+
+import (
+    "context"
+    "myservice/internal/domain"
+)
+
+type UserCreator interface {
+    Create(ctx context.Context, user domain.User) error
+}
+```
+
+```go
+// internal/usecase/auth/register/usecase.go
+package register
+
+type UseCase struct{ users UserCreator }
+
+func New(users UserCreator) *UseCase {
+    return &UseCase{users: users}
+}
+```
+
+```go
+// internal/repository/postgres/user/repository.go
+package user
+
+type Repository struct { /* pgx dependency */ }
+
+func New(/* pgx dependency */) *Repository {
+    return &Repository{}
+}
+```
+
+The same rule applies when a service consumes a dependency: its
+`dependencies.go` declares the required interface, and its constructor returns
+`*Service`. At a handler boundary, declare a small usecase interface in the
+handler package only when the handler needs to abstract or mock it.
+
+### Layer responsibilities
+
+| Layer | May do | Must not do |
+| --- | --- | --- |
+| Handler | Decode/validate transport DTO, extract JWT subject, call its usecase, map errors, trace request. | Execute SQL, call a repository, contain application flow or reusable business logic. |
+| Usecase | Authorize the request, orchestrate ports, choose transaction boundary, return request result. | Depend on HTTP/gRPC types, concrete `pgxpool`, or another request's usecase. |
+| Service | Provide reusable domain/application logic through a small interface. | Depend on handler types or own a request endpoint. |
+| Repository | Execute SQL/pgx calls, map persistence records and return domain data. | Decide access policy, issue tokens, or map HTTP/gRPC errors. |
+
+When changing existing code, migrate it toward this shape opportunistically in
+the same feature change; all newly written request code must follow it from the
+start.
+
 ## Tech Stack
 
 - **Language**: Go 1.25+
@@ -87,21 +235,18 @@ microservice/
 │   └── migrate/
 │       └── main.go
 ├── internal/                     # Core application logic
-│   ├── domain/                   # Domain models and interfaces
-│   │   ├── user.go
-│   │   ├── repository.go
-│   │   └── service.go
-│   ├── usecase/                  # Business logic/use cases
-│   │   ├── user_usecase.go
-│   │   └── interfaces.go
-│   ├── repository/               # Data access layer
-│   │   ├── postgres/
-│   │   ├── redis/
-│   │   └── interfaces.go
-│   ├── delivery/                 # Transport layer
-│   │   ├── http/
-│   │   ├── grpc/
-│   │   └── middleware/
+│   ├── handler/                  # One package/file for each transport request
+│   │   ├── http/<feature>/<request>/handler.go
+│   │   └── grpc/<feature>/<request>/handler.go
+│   ├── usecase/                  # One package per handler/request
+│   │   └── <feature>/<request>/
+│   │       ├── usecase.go
+│   │       └── ports.go
+│   ├── service/                  # Optional reusable logic in separate packages
+│   │   └── <concern>/service.go
+│   ├── repository/               # Separate persistence packages
+│   │   └── postgres/<entity>/repository.go
+│   ├── domain/                   # Small transport-agnostic domain types
 │   └── config/                   # Configuration
 │       └── config.go
 ├── pkg/                          # Shared utilities
@@ -1048,6 +1193,9 @@ func IsInternal(err error) bool {
 
 - **Write idiomatic Go code** following standard conventions and patterns
 - **Apply Clean Architecture** with clear separation between layers
+- **Follow the mandatory request architecture**: one handler package and one
+  dedicated usecase package per request; use optional shared services and
+  separate repository packages only through explicit interfaces
 - **Use interface-driven development** with explicit dependency injection
 - **Prefer composition over inheritance** with small, purpose-specific interfaces
 - **Write short, focused functions** with single responsibility

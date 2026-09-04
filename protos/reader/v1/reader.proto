@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package reader.v1;
+
+option go_package = "github.com/deniskrylov/english-reader/backend/gen/reader/v1;readerv1";
+
+service ReaderService {
+  rpc GetReadingState(GetReadingStateRequest) returns (ReadingState);
+  rpc GetChapter(GetChapterRequest) returns (Chapter);
+  rpc GetAdjacentChapter(GetAdjacentChapterRequest) returns (Chapter);
+  rpc SaveReadingProgress(SaveReadingProgressRequest) returns (ReadingProgress);
+  rpc GetReaderSettings(GetReaderSettingsRequest) returns (ReaderSettings);
+  rpc UpdateReaderSettings(UpdateReaderSettingsRequest) returns (ReaderSettings);
+}
+
+message Chapter { string id = 1; string href = 2; int32 sequence = 3; string start_cfi = 4; string end_cfi = 5; string sanitized_html = 6; int32 total_chapters = 7; }
+message ReadingProgress { string chapter_id = 1; string epub_cfi = 2; double progress_percent = 3; int64 revision = 4; }
+message ReaderSettings { int32 font_scale = 1; string theme = 2; double line_height = 3; string highlight_color = 4; }
+message ReadingState { Chapter chapter = 1; ReadingProgress progress = 2; ReaderSettings settings = 3; }
+message GetReadingStateRequest { string access_token = 1; string book_id = 2; }
+message GetChapterRequest { string access_token = 1; string book_id = 2; string chapter_id = 3; string href = 4; }
+message GetAdjacentChapterRequest { string access_token = 1; string book_id = 2; string chapter_id = 3; int32 direction = 4; }
+message SaveReadingProgressRequest { string access_token = 1; string book_id = 2; string chapter_id = 3; string epub_cfi = 4; double progress_percent = 5; int64 revision = 6; }
+message GetReaderSettingsRequest { string access_token = 1; }
+message UpdateReaderSettingsRequest { string access_token = 1; int32 font_scale = 2; string theme = 3; double line_height = 4; string highlight_color = 5; }
