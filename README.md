@@ -99,6 +99,15 @@ Frontend использует gRPC-Web через Envoy для каталога,
 - [README backend](backend/README.md)
 - [Развёртывание на Ubuntu рядом с Remnawave](deploy/production/README.md)
 
+## Обновление сайта на сервере
+
+После изменения кода: проверьте изменения локально, сделайте `git commit` и
+`git push origin main`. Затем по SSH перейдите в
+`/opt/english-reader/app`, выполните `git pull --ff-only origin main` и
+запустите обновление контейнеров и миграций. Полная безопасная инструкция,
+включая импорт обновлённого словаря и откат, находится в
+[production README](deploy/production/README.md#updating-the-deployed-application).
+
 ## Поддержка инструкций
 
 README-файлы — часть рабочего контракта проекта. Любое изменение команд,

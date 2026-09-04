@@ -27,6 +27,7 @@ go.work.sum
 # env file
 .env
 deploy/production/.env
+deploy/production/imports/*.jsonl
 
 ./backend/en-extract/
 
