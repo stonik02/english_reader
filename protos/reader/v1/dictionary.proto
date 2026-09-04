@@ -6,6 +6,7 @@ option go_package = "github.com/deniskrylov/english-reader/backend/gen/reader/v1
 
 service DictionaryService {
   rpc LookupWord(LookupWordRequest) returns (LookupWordResponse);
+  rpc TranslateText(TranslateTextRequest) returns (TranslateTextResponse);
 }
 
 message LookupWordRequest {
@@ -48,4 +49,16 @@ message LookupWordResponse {
   SourceMetadata source = 5;
   bool already_saved = 6;
   int64 lemma_id = 7;
+}
+
+message TranslateTextRequest {
+  string access_token = 1;
+  string book_id = 2;
+  string chapter_id = 3;
+  string text = 4;
+}
+
+message TranslateTextResponse {
+  SentenceTranslation sentence_translation = 1;
+  bool context_verified = 2;
 }

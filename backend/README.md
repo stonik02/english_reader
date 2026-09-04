@@ -141,10 +141,13 @@ Proto-файлы находятся в `../protos/reader/v1`. AuthService опи
 
 ## Словарь и переводчик
 
-`DictionaryService.LookupWord` возвращает senses из PostgreSQL и отдельно
-перевод предложения от локального LibreTranslate. При недоступности provider
-словарная часть ответа остаётся доступной, а поле `provider_error` описывает
-состояние перевода. Текст книги, JWT и user ID во внешний provider не уходят.
+`DictionaryService.LookupWord` возвращает только senses из PostgreSQL, поэтому
+словарная карточка не ждёт внешний переводчик. `DictionaryService.TranslateText`
+переводит явно переданный фрагмент и возвращает `provider_error`, если локальный
+LibreTranslate недоступен. В Compose заданы один запрос без повтора, тайм-аут
+`TRANSLATE_TIMEOUT=2s` и лимит `LOOKUP_SENTENCE_MAX_LENGTH=360`; при
+необходимости их можно переопределить в `.env`. Текст книги, JWT и user ID во
+внешний provider не уходят.
 
 Тестовый словарь можно импортировать после запуска PostgreSQL:
 

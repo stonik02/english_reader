@@ -188,3 +188,57 @@ export namespace LookupWordResponse {
   }
 }
 
+export class TranslateTextRequest extends jspb.Message {
+  getAccessToken(): string;
+  setAccessToken(value: string): TranslateTextRequest;
+
+  getBookId(): string;
+  setBookId(value: string): TranslateTextRequest;
+
+  getChapterId(): string;
+  setChapterId(value: string): TranslateTextRequest;
+
+  getText(): string;
+  setText(value: string): TranslateTextRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): TranslateTextRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: TranslateTextRequest): TranslateTextRequest.AsObject;
+  static serializeBinaryToWriter(message: TranslateTextRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): TranslateTextRequest;
+  static deserializeBinaryFromReader(message: TranslateTextRequest, reader: jspb.BinaryReader): TranslateTextRequest;
+}
+
+export namespace TranslateTextRequest {
+  export type AsObject = {
+    accessToken: string,
+    bookId: string,
+    chapterId: string,
+    text: string,
+  }
+}
+
+export class TranslateTextResponse extends jspb.Message {
+  getSentenceTranslation(): SentenceTranslation | undefined;
+  setSentenceTranslation(value?: SentenceTranslation): TranslateTextResponse;
+  hasSentenceTranslation(): boolean;
+  clearSentenceTranslation(): TranslateTextResponse;
+
+  getContextVerified(): boolean;
+  setContextVerified(value: boolean): TranslateTextResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): TranslateTextResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: TranslateTextResponse): TranslateTextResponse.AsObject;
+  static serializeBinaryToWriter(message: TranslateTextResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): TranslateTextResponse;
+  static deserializeBinaryFromReader(message: TranslateTextResponse, reader: jspb.BinaryReader): TranslateTextResponse;
+}
+
+export namespace TranslateTextResponse {
+  export type AsObject = {
+    sentenceTranslation?: SentenceTranslation.AsObject,
+    contextVerified: boolean,
+  }
+}
+

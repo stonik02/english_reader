@@ -6,22 +6,27 @@ import (
 	readerv1 "github.com/deniskrylov/english-reader/backend/gen/reader/v1"
 )
 
-// DictionaryService is registered before the LookupWord application layer is
-// wired. It keeps the public contract discoverable without pretending that the
-// endpoint is implemented.
 type DictionaryService struct {
 	readerv1.UnimplementedDictionaryServiceServer
-	handler LookupWordHandler
+	lookup    LookupWordHandler
+	translate TranslateTextHandler
 }
 
 type LookupWordHandler interface {
 	LookupWord(context.Context, *readerv1.LookupWordRequest) (*readerv1.LookupWordResponse, error)
 }
+type TranslateTextHandler interface {
+	TranslateText(context.Context, *readerv1.TranslateTextRequest) (*readerv1.TranslateTextResponse, error)
+}
 
-func NewDictionaryService(handler LookupWordHandler) *DictionaryService {
-	return &DictionaryService{handler: handler}
+func NewDictionaryService(lookup LookupWordHandler, translate TranslateTextHandler) *DictionaryService {
+	return &DictionaryService{lookup: lookup, translate: translate}
 }
 
 func (s *DictionaryService) LookupWord(ctx context.Context, request *readerv1.LookupWordRequest) (*readerv1.LookupWordResponse, error) {
-	return s.handler.LookupWord(ctx, request)
+	return s.lookup.LookupWord(ctx, request)
+}
+
+func (s *DictionaryService) TranslateText(ctx context.Context, request *readerv1.TranslateTextRequest) (*readerv1.TranslateTextResponse, error) {
+	return s.translate.TranslateText(ctx, request)
 }

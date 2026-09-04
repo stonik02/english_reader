@@ -1,5 +1,8 @@
 import {
   type CSSProperties,
+  type PointerEvent,
+  type RefObject,
+  memo,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -17,7 +20,11 @@ import {
   useUpdateReaderSettings,
 } from '../features/reader/useReader'
 import { contextWindow } from '../features/reader/contextWindow'
-import { useDictionaryLookup } from '../features/reader/useDictionaryLookup'
+import { decorateInteractiveWords } from '../features/reader/decorateInteractiveWords'
+import {
+  useDictionaryLookup,
+  useTextTranslation,
+} from '../features/reader/useDictionaryLookup'
 import { applyHighlights } from '../features/vocabulary/applyHighlights'
 import {
   useHighlights,
@@ -32,6 +39,8 @@ export function ReaderPage() {
   const settingsQuery = useReaderSettings()
   const updateSettings = useUpdateReaderSettings()
   const dictionary = useDictionaryLookup()
+  const translation = useTextTranslation()
+  const fragmentTranslation = useTextTranslation()
   const saveVocabulary = useSaveVocabularyEntry()
   const [chapter, setChapter] = useState<Chapter | null>(null)
   const [revision, setRevision] = useState(0)
@@ -42,14 +51,18 @@ export function ReaderPage() {
   const [lineHeight, setLineHeight] = useState(1.5)
   const [highlightColor, setHighlightColor] = useState('yellow')
   const [selection, setSelection] = useState<SelectionContext | null>(null)
+  const [fragment, setFragment] = useState<string | null>(null)
   const [savedLemmaIds, setSavedLemmaIds] = useState<number[]>([])
   const chapterContent = useRef<HTMLElement>(null)
+  const chapterPointerUp = useRef<(event: PointerEvent<HTMLElement>) => void>(
+    () => {},
+  )
+  const fragmentButton = useRef<HTMLButtonElement>(null)
+  const selectedFragment = useRef('')
   const revisionRef = useRef(0)
   const chapterNavigationRef = useRef(false)
   const saveProgressRef = useRef(saveProgress.mutate)
   const saveProgressPendingRef = useRef(saveProgress.isPending)
-  const wholeSentencePressTimer = useRef<number | null>(null)
-  const translateWholeSentenceRef = useRef(false)
   const highlights = useHighlights(bookId, chapter?.getId())
 
   revisionRef.current = revision
@@ -90,10 +103,13 @@ export function ReaderPage() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [dictionary.data, selection])
 
-  useEffect(() => {
-    if (!chapterContent.current) return
-    applyHighlights(
-      chapterContent.current,
+  // React can restore the original EPUB HTML after an unrelated state update.
+  // Watch for that specific DOM replacement instead of walking a whole chapter
+  // on every render: EPUB chapters can contain thousands of words.
+  useLayoutEffect(() => {
+    const root = chapterContent.current
+    if (!root) return
+    const highlightTokens =
       highlights.data?.getTokensList().map((token) => {
         const getTexts = token.getTextsList
         return {
@@ -102,8 +118,18 @@ export function ReaderPage() {
               ? getTexts.call(token)
               : [token.getLemma()],
         }
-      }) ?? [],
-    )
+      }) ?? []
+
+    const observer = new MutationObserver(() => restoreEnhancements())
+    const restoreEnhancements = () => {
+      observer.disconnect()
+      decorateInteractiveWords(root)
+      applyHighlights(root, highlightTokens)
+      observer.observe(root, { childList: true, subtree: true })
+    }
+    restoreEnhancements()
+
+    return () => observer.disconnect()
   }, [chapter, highlights.data, highlightColor])
 
   useLayoutEffect(() => {
@@ -207,53 +233,78 @@ export function ReaderPage() {
     window.scrollBy({ top: direction * pageHeight, behavior: 'smooth' })
   }
 
-  function lookUp(word: string, sentence: string) {
+  function lookUp(word: string) {
     if (!bookId || !chapter) return
     dictionary.mutate({
       bookId,
       chapterId: chapter.getId(),
       selectedText: word,
-      sentenceText: sentence,
-      epubCfi: chapter.getStartCfi(),
     })
   }
 
-  function captureSelection(translateWholeSentence = false) {
-    const browserSelection = window.getSelection()
-    const word = browserSelection?.toString().trim() ?? ''
-    if (!word) {
-      setSelection(null)
-      return
-    }
+  function translateSelection(text: string, kind: 'context' | 'sentence') {
+    if (!bookId || !chapter || !selection) return
+    translation.reset()
+    setSelection({ ...selection, translationText: text, translationKind: kind })
+    translation.mutate({ bookId, chapterId: chapter.getId(), text })
+  }
+
+  function openWord(word: string, text: string | null | undefined) {
     dictionary.reset()
-    const text = selectionContainerText(browserSelection)
-    const translationText = translateWholeSentence
-      ? sentenceFor(word, text)
-      : contextWindow(word, text)
-    setSelection({ word, sentence: translationText })
-    lookUp(word, translationText)
-  }
-
-  function startTranslationPress() {
-    cancelTranslationPress()
-    translateWholeSentenceRef.current = false
-    wholeSentencePressTimer.current = window.setTimeout(() => {
-      translateWholeSentenceRef.current = true
-    }, 600)
-  }
-
-  function finishTranslationPress() {
-    const translateWholeSentence = translateWholeSentenceRef.current
-    cancelTranslationPress()
-    // Native selection is finalized after pointerup, especially on touch screens.
-    window.setTimeout(() => captureSelection(translateWholeSentence), 0)
-  }
-
-  function cancelTranslationPress() {
-    if (wholeSentencePressTimer.current !== null) {
-      window.clearTimeout(wholeSentencePressTimer.current)
-      wholeSentencePressTimer.current = null
+    translation.reset()
+    const context = contextWindow(word, text)
+    const fullSentence = sentenceFor(word, text)
+    setSelection({ word, translationText: context, fullSentence, translationKind: 'context' })
+    lookUp(word)
+    if (bookId && chapter) {
+      translation.mutate({ bookId, chapterId: chapter.getId(), text: context })
     }
+  }
+
+  function handleChapterPointerUp(event: PointerEvent<HTMLElement>) {
+    const target = event.target as Element
+    window.setTimeout(() => {
+      const browserSelection = window.getSelection()
+      const range = browserSelection?.rangeCount
+        ? browserSelection.getRangeAt(0)
+        : null
+      const text = browserSelection?.toString().trim().replace(/\s+/g, ' ') ?? ''
+      const isFromChapter = Boolean(
+        range && chapterContent.current?.contains(range.commonAncestorContainer),
+      )
+      const wordCount = text.match(/[\p{L}]+(?:['’][\p{L}]+)*/gu)?.length ?? 0
+      if (isFromChapter && wordCount >= 2) {
+        // Keep the browser's native selection visible until the reader chooses
+        // whether to translate it.
+        selectedFragment.current = text
+        if (fragmentButton.current) fragmentButton.current.hidden = false
+        return
+      }
+
+      selectedFragment.current = ''
+      if (fragmentButton.current) fragmentButton.current.hidden = true
+      const word = target.closest<HTMLElement>('[data-reader-word]')
+      if (!word || !chapterContent.current?.contains(word)) return
+      // A short tap can cause mobile browsers to select the word. It is still
+      // a word lookup, not a request to translate a phrase.
+      browserSelection?.removeAllRanges()
+      openWord(word.dataset.readerWord ?? '', selectionContainerText(word))
+    }, 0)
+  }
+
+  function openFragmentTranslation() {
+    const text = selectedFragment.current
+    if (!bookId || !chapter || !text) return
+    fragmentTranslation.reset()
+    setFragment(text)
+    selectedFragment.current = ''
+    if (fragmentButton.current) fragmentButton.current.hidden = true
+    window.getSelection()?.removeAllRanges()
+    fragmentTranslation.mutate({
+      bookId,
+      chapterId: chapter.getId(),
+      text,
+    })
   }
 
   function saveSelectedWord() {
@@ -280,6 +331,7 @@ export function ReaderPage() {
   }
   if (!chapter) return <ReaderStatus>В книге нет доступных глав.</ReaderStatus>
   const progress = Math.round(progressPercent)
+  chapterPointerUp.current = handleChapterPointerUp
 
   return (
     <main className={`reader-page reader-theme-${theme}`}>
@@ -372,21 +424,23 @@ export function ReaderPage() {
         <p className="eyebrow">Глава {chapter.getSequence() + 1}</p>
         <h1 id="reader-title">Чтение книги</h1>
         <p className="reader-progress">Текущий прогресс: {progress}%</p>
-        <article
-          ref={chapterContent}
-          className="chapter-content"
-          style={
-            {
-              fontSize: `${fontScale}%`,
-              lineHeight,
-              '--vocabulary-highlight-color': `var(--highlight-${highlightColor})`,
-            } as CSSProperties
-          }
-          dangerouslySetInnerHTML={{ __html: chapter.getSanitizedHtml() }}
-          onPointerCancel={cancelTranslationPress}
-          onPointerDown={startTranslationPress}
-          onPointerUp={finishTranslationPress}
+        <ChapterArticle
+          contentRef={chapterContent}
+          fontScale={fontScale}
+          highlightColor={highlightColor}
+          html={chapter.getSanitizedHtml()}
+          lineHeight={lineHeight}
+          onPointerUpRef={chapterPointerUp}
         />
+        <button
+          ref={fragmentButton}
+          className="lookup-button"
+          type="button"
+          hidden
+          onClick={openFragmentTranslation}
+        >
+          Перевести выделенное
+        </button>
         {selection && (
           <div
             className="modal-backdrop"
@@ -407,7 +461,7 @@ export function ReaderPage() {
                   <button
                     className="text-button"
                     type="button"
-                    onClick={() => lookUp(selection.word, selection.sentence)}
+                    onClick={() => lookUp(selection.word)}
                   >
                     Повторить
                   </button>
@@ -424,29 +478,60 @@ export function ReaderPage() {
                       </p>
                     </div>
                   ))}
-                  {dictionary.data
-                    .getSentenceTranslation()
-                    ?.getTranslatedText() && (
-                    <div className="translation-context">
-                      <p>
-                        <ContextPreview
-                          context={selection.sentence}
-                          selectedWord={selection.word}
-                        />
-                      </p>
+                  <div className="translation-context">
+                    <p>
+                      <ContextPreview
+                        context={selection.translationText}
+                        selectedWord={selection.word}
+                      />
+                    </p>
+                    {translation.isPending && <p>Переводим…</p>}
+                    {translation.data
+                      ?.getSentenceTranslation()
+                      ?.getTranslatedText() && (
                       <p>
                         <em>
-                          {dictionary.data
+                          {translation.data
                             .getSentenceTranslation()
                             ?.getTranslatedText()}
                         </em>
                       </p>
-                    </div>
-                  )}
-                  {dictionary.data
-                    .getSentenceTranslation()
-                    ?.getProviderError() && (
-                    <p className="reader-error">Перевод временно недоступен.</p>
+                    )}
+                    {(translation.isError ||
+                      translation.data
+                        ?.getSentenceTranslation()
+                        ?.getProviderError()) && (
+                      <p className="reader-error">
+                        Перевод временно недоступен.
+                      </p>
+                    )}
+                  </div>
+                  {selection.translationKind === 'context' &&
+                    selection.fullSentence !== selection.translationText && (
+                      <button
+                        className="text-button"
+                        type="button"
+                        disabled={translation.isPending}
+                        onClick={() =>
+                          translateSelection(selection.fullSentence, 'sentence')
+                        }
+                      >
+                        Перевести предложение
+                      </button>
+                    )}
+                  {selection.translationKind === 'sentence' && (
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() =>
+                        translateSelection(
+                          contextWindow(selection.word, selection.fullSentence),
+                          'context',
+                        )
+                      }
+                    >
+                      К короткому контексту
+                    </button>
                   )}
                   {groupSenses(dictionary.data.getSensesList()).map((sense) => (
                     <div key={`examples-${sense.partOfSpeech}`}>
@@ -487,6 +572,49 @@ export function ReaderPage() {
                 className="text-button"
                 type="button"
                 onClick={() => setSelection(null)}
+              >
+                Закрыть
+              </button>
+            </section>
+          </div>
+        )}
+        {fragment && (
+          <div className="modal-backdrop" onMouseDown={() => setFragment(null)}>
+            <section
+              className="translation-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="fragment-translation-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <h2 id="fragment-translation-title">Перевод выделенного</h2>
+              <div className="translation-context">
+                <p>{fragment}</p>
+                {fragmentTranslation.isPending && <p>Переводим…</p>}
+                {fragmentTranslation.data
+                  ?.getSentenceTranslation()
+                  ?.getTranslatedText() && (
+                  <p>
+                    <em>
+                      {fragmentTranslation.data
+                        .getSentenceTranslation()
+                        ?.getTranslatedText()}
+                    </em>
+                  </p>
+                )}
+                {(fragmentTranslation.isError ||
+                  fragmentTranslation.data
+                    ?.getSentenceTranslation()
+                    ?.getProviderError()) && (
+                  <p className="reader-error">
+                    Перевод временно недоступен.
+                  </p>
+                )}
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setFragment(null)}
               >
                 Закрыть
               </button>
@@ -551,9 +679,43 @@ export function ReaderPage() {
   )
 }
 
+const ChapterArticle = memo(function ChapterArticle({
+  contentRef,
+  fontScale,
+  highlightColor,
+  html,
+  lineHeight,
+  onPointerUpRef,
+}: {
+  contentRef: RefObject<HTMLElement | null>
+  fontScale: number
+  highlightColor: string
+  html: string
+  lineHeight: number
+  onPointerUpRef: RefObject<(event: PointerEvent<HTMLElement>) => void>
+}) {
+  return (
+    <article
+      ref={contentRef}
+      className="chapter-content"
+      style={
+        {
+          fontSize: `${fontScale}%`,
+          lineHeight,
+          '--vocabulary-highlight-color': `var(--highlight-${highlightColor})`,
+        } as CSSProperties
+      }
+      dangerouslySetInnerHTML={{ __html: html }}
+      onPointerUp={(event) => onPointerUpRef.current(event)}
+    />
+  )
+})
+
 type SelectionContext = {
   word: string
-  sentence: string
+  translationText: string
+  fullSentence: string
+  translationKind: 'context' | 'sentence'
 }
 
 type DictionarySenseLike = {
@@ -620,14 +782,7 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function selectionContainerText(selection: Selection | null) {
-  const node = selection?.rangeCount
-    ? selection.getRangeAt(0).commonAncestorContainer
-    : null
-  const element =
-    node?.nodeType === Node.ELEMENT_NODE
-      ? (node as Element)
-      : node?.parentElement
+function selectionContainerText(element: Element) {
   return element?.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote')
     ?.textContent
 }

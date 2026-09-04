@@ -20,6 +20,7 @@ import (
 	grefresh "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/auth/refresh"
 	gregistration "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/auth/register"
 	dictionaryhandler "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/dictionary/lookupword"
+	dictionarytranslatehandler "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/dictionary/translatetext"
 	grpcLibraryAdd "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/library/addtomylibrary"
 	grpcLibraryDelete "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/library/deletebook"
 	grpcLibraryGet "github.com/deniskrylov/english-reader/backend/internal/handler/grpc/library/getbook"
@@ -72,6 +73,7 @@ import (
 	refresh "github.com/deniskrylov/english-reader/backend/internal/usecase/auth/refresh"
 	register "github.com/deniskrylov/english-reader/backend/internal/usecase/auth/register"
 	dictionarylookup "github.com/deniskrylov/english-reader/backend/internal/usecase/dictionary/lookupword"
+	dictionarytranslate "github.com/deniskrylov/english-reader/backend/internal/usecase/dictionary/translatetext"
 	libraryadd "github.com/deniskrylov/english-reader/backend/internal/usecase/library/addtomylibrary"
 	librarydelete "github.com/deniskrylov/english-reader/backend/internal/usecase/library/deletebook"
 	libraryget "github.com/deniskrylov/english-reader/backend/internal/usecase/library/getbook"
@@ -237,14 +239,20 @@ func newGRPCDictionaryService(pool *pgxpool.Pool, cfg config.Config) *grpcserver
 		wordnormalizer.New(cfg.LookupWordMaxLength),
 		morphology.New(),
 		repodictionary.New(pool),
-		repodictionary.New(pool),
 		repovocabulary.New(pool),
+	)
+	translate := dictionarytranslate.New(
+		repodictionary.New(pool),
+		repodictionary.New(pool),
 		libretranslate.New(cfg.TranslateURL, cfg.TranslateTimeout, cfg.LookupSentenceMaxLength),
 		"libretranslate-en-ru",
 		cfg.TranslateCacheTTL,
 	)
 
-	return grpcserver.NewDictionaryService(dictionaryhandler.New(lookup, tokens))
+	return grpcserver.NewDictionaryService(
+		dictionaryhandler.New(lookup, tokens),
+		dictionarytranslatehandler.New(translate, tokens),
+	)
 }
 
 func newGRPCLibraryService(pool *pgxpool.Pool, secret string, accessTTL time.Duration, storagePath string) *grpcserver.LibraryService {

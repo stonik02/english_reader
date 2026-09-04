@@ -33,7 +33,7 @@ func (s *Service) Translate(ctx context.Context, text string) (string, error) {
 	if s.isOpen() {
 		return "", ErrUnavailable
 	}
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < 1; attempt++ {
 		translated, temporary, err := s.request(ctx, text)
 		if err == nil {
 			s.succeed()

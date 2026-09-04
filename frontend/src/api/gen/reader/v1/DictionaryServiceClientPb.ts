@@ -82,5 +82,48 @@ export class DictionaryServiceClient {
     this.methodDescriptorLookupWord);
   }
 
+  methodDescriptorTranslateText = new grpcWeb.MethodDescriptor(
+    '/reader.v1.DictionaryService/TranslateText',
+    grpcWeb.MethodType.UNARY,
+    reader_v1_dictionary_pb.TranslateTextRequest,
+    reader_v1_dictionary_pb.TranslateTextResponse,
+    (request: reader_v1_dictionary_pb.TranslateTextRequest) => {
+      return request.serializeBinary();
+    },
+    reader_v1_dictionary_pb.TranslateTextResponse.deserializeBinary
+  );
+
+  translateText(
+    request: reader_v1_dictionary_pb.TranslateTextRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<reader_v1_dictionary_pb.TranslateTextResponse>;
+
+  translateText(
+    request: reader_v1_dictionary_pb.TranslateTextRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: reader_v1_dictionary_pb.TranslateTextResponse) => void): grpcWeb.ClientReadableStream<reader_v1_dictionary_pb.TranslateTextResponse>;
+
+  translateText(
+    request: reader_v1_dictionary_pb.TranslateTextRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: reader_v1_dictionary_pb.TranslateTextResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/reader.v1.DictionaryService/TranslateText',
+        request,
+        metadata || {},
+        this.methodDescriptorTranslateText,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/reader.v1.DictionaryService/TranslateText',
+    request,
+    metadata || {},
+    this.methodDescriptorTranslateText);
+  }
+
 }
 

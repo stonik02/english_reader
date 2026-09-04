@@ -36,3 +36,9 @@ type LookupResponse struct {
 	SourceVersion       string
 	AlreadySaved        bool
 }
+
+type TextTranslationResponse struct {
+	Text            string
+	ProviderError   string
+	ContextVerified bool
+}

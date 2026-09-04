@@ -2,8 +2,6 @@ package lookupword
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	domain "github.com/deniskrylov/english-reader/backend/internal/domain/dictionary"
 )
@@ -16,24 +14,16 @@ type Request struct {
 	SentenceText string
 }
 type UseCase struct {
-	normalizer   WordNormalizer
-	morphology   Morphology
-	dictionary   DictionaryRepository
-	reader       ReaderPort
-	vocabulary   VocabularyReader
-	translator   TranslationProvider
-	modelVersion string
-	cacheTTL     time.Duration
+	normalizer WordNormalizer
+	morphology Morphology
+	dictionary DictionaryRepository
+	vocabulary VocabularyReader
 }
 
-func New(n WordNormalizer, m Morphology, d DictionaryRepository, r ReaderPort, v VocabularyReader, t TranslationProvider, version string, ttl time.Duration) *UseCase {
-	return &UseCase{normalizer: n, morphology: m, dictionary: d, reader: r, vocabulary: v, translator: t, modelVersion: version, cacheTTL: ttl}
+func New(n WordNormalizer, m Morphology, d DictionaryRepository, v VocabularyReader) *UseCase {
+	return &UseCase{normalizer: n, morphology: m, dictionary: d, vocabulary: v}
 }
 func (u *UseCase) Execute(ctx context.Context, request Request) (domain.LookupResponse, error) {
-	plainText, err := u.reader.ChapterPlainText(ctx, request.BookID, request.ChapterID)
-	if err != nil {
-		return domain.LookupResponse{}, err
-	}
 	word, err := u.normalizer.Normalize(request.SelectedText)
 	if err != nil {
 		return domain.LookupResponse{}, err
@@ -51,7 +41,7 @@ func (u *UseCase) Execute(ctx context.Context, request Request) (domain.LookupRe
 			break
 		}
 	}
-	response := domain.LookupResponse{LemmaID: result.LemmaID, NormalizedLemma: lemma, Senses: result.Senses, ContextVerified: strings.Contains(plainText, request.SentenceText), Source: result.Source, SourceVersion: result.SourceVersion}
+	response := domain.LookupResponse{LemmaID: result.LemmaID, NormalizedLemma: lemma, Senses: result.Senses, Source: result.Source, SourceVersion: result.SourceVersion}
 	if result.LemmaID != 0 {
 		alreadySaved, savedErr := u.vocabulary.IsSaved(ctx, request.UserID, result.LemmaID)
 		if savedErr != nil {
@@ -59,16 +49,5 @@ func (u *UseCase) Execute(ctx context.Context, request Request) (domain.LookupRe
 		}
 		response.AlreadySaved = alreadySaved
 	}
-	if cached, hit, err := u.dictionary.CachedTranslation(ctx, request.SentenceText, u.modelVersion); err == nil && hit {
-		response.SentenceTranslation = cached.Text
-		return response, nil
-	}
-	translated, err := u.translator.Translate(ctx, request.SentenceText)
-	if err != nil {
-		response.ProviderError = "translation provider unavailable"
-		return response, nil
-	}
-	response.SentenceTranslation = translated
-	_ = u.dictionary.PutTranslation(ctx, request.SentenceText, translated, u.modelVersion, u.cacheTTL)
 	return response, nil
 }
