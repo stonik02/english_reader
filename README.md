@@ -97,6 +97,7 @@ Frontend использует gRPC-Web через Envoy для каталога,
 - [Карта экранов](frontend/docs/SCREENS.md)
 - [План разработки frontend](frontend/docs/IMPLEMENTATION_PLAN.md)
 - [README backend](backend/README.md)
+- [Развёртывание на Ubuntu рядом с Remnawave](deploy/production/README.md)
 
 ## Поддержка инструкций
 

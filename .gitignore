@@ -26,6 +26,7 @@ go.work.sum
 
 # env file
 .env
+deploy/production/.env
 
 ./backend/en-extract/
 
