@@ -34,5 +34,8 @@ func (h *Handler) LookupWord(ctx context.Context, q *readerv1.LookupWordRequest)
 	for _, sense := range value.Senses {
 		response.Senses = append(response.Senses, &readerv1.DictionarySense{Id: sense.ID, PartOfSpeech: sense.PartOfSpeech, Translations: sense.Translations, ExampleEn: sense.ExampleEN, ExampleRu: sense.ExampleRU, SourceUrl: sense.SourceURL, Attribution: sense.Attribution})
 	}
+	for _, pronunciation := range value.Pronunciations {
+		response.Pronunciations = append(response.Pronunciations, &readerv1.Pronunciation{Ipa: pronunciation.IPA, Accent: pronunciation.Accent, AudioUrl: pronunciation.AudioURL, SourceUrl: pronunciation.SourceURL, Attribution: pronunciation.Attribution, License: pronunciation.License})
+	}
 	return response, nil
 }

@@ -800,7 +800,9 @@ proto.reader.v1.ReaderSettings.toObject = function(includeInstance, msg) {
 fontScale: jspb.Message.getFieldWithDefault(msg, 1, 0),
 theme: jspb.Message.getFieldWithDefault(msg, 2, ""),
 lineHeight: jspb.Message.getFloatingPointFieldWithDefault(msg, 3, 0.0),
-highlightColor: jspb.Message.getFieldWithDefault(msg, 4, "")
+highlightColor: jspb.Message.getFieldWithDefault(msg, 4, ""),
+ttsVoiceUri: jspb.Message.getFieldWithDefault(msg, 5, ""),
+ttsRate: jspb.Message.getFloatingPointFieldWithDefault(msg, 6, 0.0)
   };
 
   if (includeInstance) {
@@ -852,6 +854,14 @@ proto.reader.v1.ReaderSettings.deserializeBinaryFromReader = function(msg, reade
     case 4:
       var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setHighlightColor(value);
+      break;
+    case 5:
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
+      msg.setTtsVoiceUri(value);
+      break;
+    case 6:
+      var value = /** @type {number} */ (reader.readDouble());
+      msg.setTtsRate(value);
       break;
     default:
       reader.skipField();
@@ -907,6 +917,20 @@ proto.reader.v1.ReaderSettings.serializeBinaryToWriter = function(message, write
   if (f.length > 0) {
     writer.writeString(
       4,
+      f
+    );
+  }
+  f = message.getTtsVoiceUri();
+  if (f.length > 0) {
+    writer.writeString(
+      5,
+      f
+    );
+  }
+  f = message.getTtsRate();
+  if (f !== 0.0) {
+    writer.writeDouble(
+      6,
       f
     );
   }
@@ -982,6 +1006,42 @@ proto.reader.v1.ReaderSettings.prototype.getHighlightColor = function() {
  */
 proto.reader.v1.ReaderSettings.prototype.setHighlightColor = function(value) {
   return jspb.Message.setProto3StringField(this, 4, value);
+};
+
+
+/**
+ * optional string tts_voice_uri = 5;
+ * @return {string}
+ */
+proto.reader.v1.ReaderSettings.prototype.getTtsVoiceUri = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 5, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.reader.v1.ReaderSettings} returns this
+ */
+proto.reader.v1.ReaderSettings.prototype.setTtsVoiceUri = function(value) {
+  return jspb.Message.setProto3StringField(this, 5, value);
+};
+
+
+/**
+ * optional double tts_rate = 6;
+ * @return {number}
+ */
+proto.reader.v1.ReaderSettings.prototype.getTtsRate = function() {
+  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 6, 0.0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.reader.v1.ReaderSettings} returns this
+ */
+proto.reader.v1.ReaderSettings.prototype.setTtsRate = function(value) {
+  return jspb.Message.setProto3FloatField(this, 6, value);
 };
 
 
@@ -2284,7 +2344,9 @@ accessToken: jspb.Message.getFieldWithDefault(msg, 1, ""),
 fontScale: jspb.Message.getFieldWithDefault(msg, 2, 0),
 theme: jspb.Message.getFieldWithDefault(msg, 3, ""),
 lineHeight: jspb.Message.getFloatingPointFieldWithDefault(msg, 4, 0.0),
-highlightColor: jspb.Message.getFieldWithDefault(msg, 5, "")
+highlightColor: jspb.Message.getFieldWithDefault(msg, 5, ""),
+ttsVoiceUri: jspb.Message.getFieldWithDefault(msg, 6, ""),
+ttsRate: jspb.Message.getFloatingPointFieldWithDefault(msg, 7, 0.0)
   };
 
   if (includeInstance) {
@@ -2340,6 +2402,14 @@ proto.reader.v1.UpdateReaderSettingsRequest.deserializeBinaryFromReader = functi
     case 5:
       var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setHighlightColor(value);
+      break;
+    case 6:
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
+      msg.setTtsVoiceUri(value);
+      break;
+    case 7:
+      var value = /** @type {number} */ (reader.readDouble());
+      msg.setTtsRate(value);
       break;
     default:
       reader.skipField();
@@ -2402,6 +2472,20 @@ proto.reader.v1.UpdateReaderSettingsRequest.serializeBinaryToWriter = function(m
   if (f.length > 0) {
     writer.writeString(
       5,
+      f
+    );
+  }
+  f = message.getTtsVoiceUri();
+  if (f.length > 0) {
+    writer.writeString(
+      6,
+      f
+    );
+  }
+  f = message.getTtsRate();
+  if (f !== 0.0) {
+    writer.writeDouble(
+      7,
       f
     );
   }
@@ -2495,6 +2579,42 @@ proto.reader.v1.UpdateReaderSettingsRequest.prototype.getHighlightColor = functi
  */
 proto.reader.v1.UpdateReaderSettingsRequest.prototype.setHighlightColor = function(value) {
   return jspb.Message.setProto3StringField(this, 5, value);
+};
+
+
+/**
+ * optional string tts_voice_uri = 6;
+ * @return {string}
+ */
+proto.reader.v1.UpdateReaderSettingsRequest.prototype.getTtsVoiceUri = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 6, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.reader.v1.UpdateReaderSettingsRequest} returns this
+ */
+proto.reader.v1.UpdateReaderSettingsRequest.prototype.setTtsVoiceUri = function(value) {
+  return jspb.Message.setProto3StringField(this, 6, value);
+};
+
+
+/**
+ * optional double tts_rate = 7;
+ * @return {number}
+ */
+proto.reader.v1.UpdateReaderSettingsRequest.prototype.getTtsRate = function() {
+  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 7, 0.0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.reader.v1.UpdateReaderSettingsRequest} returns this
+ */
+proto.reader.v1.UpdateReaderSettingsRequest.prototype.setTtsRate = function(value) {
+  return jspb.Message.setProto3FloatField(this, 7, value);
 };
 
 

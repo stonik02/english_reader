@@ -97,7 +97,13 @@ func (s *ReaderService) UpdateReaderSettings(c context.Context, q *readerv1.Upda
 	if e != nil {
 		return nil, e
 	}
-	v, e := s.updateSettings.Execute(c, id, domain.Settings{FontScale: int(q.GetFontScale()), Theme: q.GetTheme(), LineHeight: q.GetLineHeight(), HighlightColor: q.GetHighlightColor()})
+	ttsRate := q.GetTtsRate()
+	// A browser tab opened before the v1.3 contract has no TTS fields. Keep
+	// saving the rest of its reader settings valid during a rolling refresh.
+	if ttsRate == 0 {
+		ttsRate = 0.9
+	}
+	v, e := s.updateSettings.Execute(c, id, domain.Settings{FontScale: int(q.GetFontScale()), Theme: q.GetTheme(), LineHeight: q.GetLineHeight(), HighlightColor: q.GetHighlightColor(), TTSVoiceURI: q.GetTtsVoiceUri(), TTSRate: ttsRate})
 	if e != nil {
 		return nil, readerError(e)
 	}
@@ -110,7 +116,7 @@ func progress(v domain.Progress) *readerv1.ReadingProgress {
 	return &readerv1.ReadingProgress{ChapterId: v.ChapterID, EpubCfi: v.EPUBCFI, ProgressPercent: v.ProgressPercent, Revision: v.Revision}
 }
 func settings(v domain.Settings) *readerv1.ReaderSettings {
-	return &readerv1.ReaderSettings{FontScale: int32(v.FontScale), Theme: v.Theme, LineHeight: v.LineHeight, HighlightColor: v.HighlightColor}
+	return &readerv1.ReaderSettings{FontScale: int32(v.FontScale), Theme: v.Theme, LineHeight: v.LineHeight, HighlightColor: v.HighlightColor, TtsVoiceUri: v.TTSVoiceURI, TtsRate: v.TTSRate}
 }
 func readerError(e error) error {
 	if errors.Is(e, domain.ErrInvalidInput) {

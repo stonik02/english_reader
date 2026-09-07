@@ -60,11 +60,11 @@ func (r *Repository) SaveProgress(ctx context.Context, userID, bookID string, va
 }
 func (r *Repository) Settings(ctx context.Context, userID string) (domain.Settings, error) {
 	var value domain.Settings
-	err := r.pool.QueryRow(ctx, `INSERT INTO user_reader_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING font_scale,theme,line_height,highlight_color`, userID).Scan(&value.FontScale, &value.Theme, &value.LineHeight, &value.HighlightColor)
+	err := r.pool.QueryRow(ctx, `INSERT INTO user_reader_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING font_scale,theme,line_height,highlight_color,tts_voice_uri,tts_rate`, userID).Scan(&value.FontScale, &value.Theme, &value.LineHeight, &value.HighlightColor, &value.TTSVoiceURI, &value.TTSRate)
 	return value, err
 }
 func (r *Repository) UpdateSettings(ctx context.Context, userID string, value domain.Settings) (domain.Settings, error) {
-	err := r.pool.QueryRow(ctx, `INSERT INTO user_reader_settings (user_id,font_scale,theme,line_height,highlight_color) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id) DO UPDATE SET font_scale=EXCLUDED.font_scale,theme=EXCLUDED.theme,line_height=EXCLUDED.line_height,highlight_color=EXCLUDED.highlight_color,updated_at=NOW() RETURNING font_scale,theme,line_height,highlight_color`, userID, value.FontScale, value.Theme, value.LineHeight, value.HighlightColor).Scan(&value.FontScale, &value.Theme, &value.LineHeight, &value.HighlightColor)
+	err := r.pool.QueryRow(ctx, `INSERT INTO user_reader_settings (user_id,font_scale,theme,line_height,highlight_color,tts_voice_uri,tts_rate) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (user_id) DO UPDATE SET font_scale=EXCLUDED.font_scale,theme=EXCLUDED.theme,line_height=EXCLUDED.line_height,highlight_color=EXCLUDED.highlight_color,tts_voice_uri=EXCLUDED.tts_voice_uri,tts_rate=EXCLUDED.tts_rate,updated_at=NOW() RETURNING font_scale,theme,line_height,highlight_color,tts_voice_uri,tts_rate`, userID, value.FontScale, value.Theme, value.LineHeight, value.HighlightColor, value.TTSVoiceURI, value.TTSRate).Scan(&value.FontScale, &value.Theme, &value.LineHeight, &value.HighlightColor, &value.TTSVoiceURI, &value.TTSRate)
 	return value, err
 }
 func (r *Repository) chapter(ctx context.Context, query string, args ...any) (domain.Chapter, error) {

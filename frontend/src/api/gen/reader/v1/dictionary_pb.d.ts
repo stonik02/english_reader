@@ -140,6 +140,44 @@ export namespace SourceMetadata {
   }
 }
 
+export class Pronunciation extends jspb.Message {
+  getIpa(): string;
+  setIpa(value: string): Pronunciation;
+
+  getAccent(): string;
+  setAccent(value: string): Pronunciation;
+
+  getAudioUrl(): string;
+  setAudioUrl(value: string): Pronunciation;
+
+  getSourceUrl(): string;
+  setSourceUrl(value: string): Pronunciation;
+
+  getAttribution(): string;
+  setAttribution(value: string): Pronunciation;
+
+  getLicense(): string;
+  setLicense(value: string): Pronunciation;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): Pronunciation.AsObject;
+  static toObject(includeInstance: boolean, msg: Pronunciation): Pronunciation.AsObject;
+  static serializeBinaryToWriter(message: Pronunciation, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): Pronunciation;
+  static deserializeBinaryFromReader(message: Pronunciation, reader: jspb.BinaryReader): Pronunciation;
+}
+
+export namespace Pronunciation {
+  export type AsObject = {
+    ipa: string,
+    accent: string,
+    audioUrl: string,
+    sourceUrl: string,
+    attribution: string,
+    license: string,
+  }
+}
+
 export class LookupWordResponse extends jspb.Message {
   getNormalizedLemma(): string;
   setNormalizedLemma(value: string): LookupWordResponse;
@@ -168,6 +206,11 @@ export class LookupWordResponse extends jspb.Message {
   getLemmaId(): number;
   setLemmaId(value: number): LookupWordResponse;
 
+  getPronunciationsList(): Array<Pronunciation>;
+  setPronunciationsList(value: Array<Pronunciation>): LookupWordResponse;
+  clearPronunciationsList(): LookupWordResponse;
+  addPronunciations(value?: Pronunciation, index?: number): Pronunciation;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): LookupWordResponse.AsObject;
   static toObject(includeInstance: boolean, msg: LookupWordResponse): LookupWordResponse.AsObject;
@@ -185,6 +228,7 @@ export namespace LookupWordResponse {
     source?: SourceMetadata.AsObject,
     alreadySaved: boolean,
     lemmaId: number,
+    pronunciationsList: Array<Pronunciation.AsObject>,
   }
 }
 

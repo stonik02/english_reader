@@ -15,15 +15,25 @@ import (
 )
 
 type record struct {
-	Lemma        string   `json:"lemma"`
-	Language     string   `json:"language"`
-	PartOfSpeech string   `json:"part_of_speech"`
-	Translations []string `json:"translations"`
-	ExampleEN    string   `json:"example_en"`
-	ExampleRU    string   `json:"example_ru"`
-	SourceURL    string   `json:"source_url"`
-	Attribution  string   `json:"attribution"`
-	Position     int      `json:"position"`
+	Lemma          string          `json:"lemma"`
+	Language       string          `json:"language"`
+	PartOfSpeech   string          `json:"part_of_speech"`
+	Translations   []string        `json:"translations"`
+	ExampleEN      string          `json:"example_en"`
+	ExampleRU      string          `json:"example_ru"`
+	SourceURL      string          `json:"source_url"`
+	Attribution    string          `json:"attribution"`
+	Position       int             `json:"position"`
+	Pronunciations []pronunciation `json:"pronunciations"`
+}
+
+type pronunciation struct {
+	IPA         string `json:"ipa"`
+	Accent      string `json:"accent"`
+	AudioURL    string `json:"audio_url"`
+	SourceURL   string `json:"source_url"`
+	Attribution string `json:"attribution"`
+	License     string `json:"license"`
 }
 
 func main() {
@@ -89,11 +99,26 @@ func importRecords(ctx context.Context, pool *pgxpool.Pool, contents []byte, sou
 		if _, cleared := clearedLemmaIDs[lemmaID]; err == nil && !cleared {
 			_, err = tx.Exec(ctx, `DELETE FROM dictionary_senses WHERE lemma_id=$1`, lemmaID)
 			if err == nil {
+				_, err = tx.Exec(ctx, `DELETE FROM dictionary_pronunciations WHERE lemma_id=$1`, lemmaID)
+			}
+			if err == nil {
 				clearedLemmaIDs[lemmaID] = struct{}{}
 			}
 		}
 		if err == nil {
 			_, err = tx.Exec(ctx, `INSERT INTO dictionary_senses (lemma_id,part_of_speech,translations,example_en,example_ru,source_url,attribution,position) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, lemmaID, value.PartOfSpeech, translations, value.ExampleEN, value.ExampleRU, value.SourceURL, value.Attribution, value.Position)
+		}
+		if err == nil {
+			for _, pronunciation := range value.Pronunciations {
+				if pronunciation.SourceURL == "" || pronunciation.Attribution == "" {
+					err = fmt.Errorf("invalid pronunciation for lemma %q", value.Lemma)
+					break
+				}
+				_, err = tx.Exec(ctx, `INSERT INTO dictionary_pronunciations (lemma_id,ipa,accent,audio_url,source_url,attribution,license) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (lemma_id,ipa,accent,audio_url) DO NOTHING`, lemmaID, pronunciation.IPA, pronunciation.Accent, pronunciation.AudioURL, pronunciation.SourceURL, pronunciation.Attribution, pronunciation.License)
+				if err != nil {
+					break
+				}
+			}
 		}
 		if err != nil {
 			_ = tx.Rollback(ctx)

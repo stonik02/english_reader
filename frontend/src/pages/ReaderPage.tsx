@@ -22,6 +22,11 @@ import { getAdjacentChapter } from '../api/reader'
 import { contextWindow } from '../features/reader/contextWindow'
 import { decorateInteractiveWordsInBatches } from '../features/reader/decorateInteractiveWords'
 import {
+  speechSynthesisSupported,
+  startSpeech,
+  subscribeEnglishVoices,
+} from '../features/reader/speechSynthesis'
+import {
   useDictionaryLookup,
   useTextTranslation,
 } from '../features/reader/useDictionaryLookup'
@@ -50,6 +55,11 @@ export function ReaderPage() {
   const [theme, setTheme] = useState('system')
   const [lineHeight, setLineHeight] = useState(1.5)
   const [highlightColor, setHighlightColor] = useState('yellow')
+  const [ttsVoiceURI, setTTSVoiceURI] = useState('')
+  const [ttsRate, setTTSRate] = useState(0.9)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
   const [selection, setSelection] = useState<SelectionContext | null>(null)
   const [fragment, setFragment] = useState<string | null>(null)
   const [savedLemmaIds, setSavedLemmaIds] = useState<number[]>([])
@@ -62,6 +72,7 @@ export function ReaderPage() {
   const revisionRef = useRef(0)
   const chapterNavigationRef = useRef(false)
   const prefetchedChapters = useRef(new Map<string, Chapter>())
+  const stopSpeechRef = useRef<() => void>(() => {})
   const saveProgressRef = useRef(saveProgress.mutate)
   const saveProgressPendingRef = useRef(saveProgress.isPending)
   const highlights = useHighlights(bookId, chapter?.getId())
@@ -93,7 +104,26 @@ export function ReaderPage() {
         ? getHighlightColor.call(settings) || 'yellow'
         : 'yellow',
     )
+    const getTTSVoiceURI = settings.getTtsVoiceUri
+    setTTSVoiceURI(
+      typeof getTTSVoiceURI === 'function' ? getTTSVoiceURI.call(settings) : '',
+    )
+    const getTTSRate = settings.getTtsRate
+    setTTSRate(
+      typeof getTTSRate === 'function' && getTTSRate.call(settings) > 0
+        ? getTTSRate.call(settings)
+        : 0.9,
+    )
   }, [settingsQuery.data])
+
+  useEffect(() => subscribeEnglishVoices(setVoices), [])
+
+  useEffect(
+    () => () => {
+      stopSpeechRef.current()
+    },
+    [chapter],
+  )
 
   useEffect(() => {
     if (!selection || !dictionary.data) return
@@ -142,7 +172,14 @@ export function ReaderPage() {
   }, [bookId, chapter])
 
   function saveSettings() {
-    updateSettings.mutate({ fontScale, theme, lineHeight, highlightColor })
+    updateSettings.mutate({
+      fontScale,
+      theme,
+      lineHeight,
+      highlightColor,
+      ttsVoiceURI,
+      ttsRate,
+    })
   }
 
   useEffect(() => {
@@ -218,6 +255,7 @@ export function ReaderPage() {
   }
 
   function applyChapter(nextChapter: Chapter) {
+    stopSpeech()
     chapterNavigationRef.current = true
     window.scrollTo({ top: 0 })
     setChapter(nextChapter)
@@ -265,6 +303,7 @@ export function ReaderPage() {
   }
 
   function openWord(word: string, text: string | null | undefined) {
+    stopSpeech()
     dictionary.reset()
     translation.reset()
     const context = contextWindow(word, text)
@@ -330,6 +369,80 @@ export function ReaderPage() {
       chapterId: chapter.getId(),
       text,
     })
+  }
+
+  function stopSpeech() {
+    stopSpeechRef.current()
+    stopSpeechRef.current = () => {}
+    setIsSpeaking(false)
+  }
+
+  function speakWithBrowser(text: string) {
+    setSpeechError(null)
+    stopSpeech()
+    const stop = startSpeech(text, {
+      voiceURI: ttsVoiceURI,
+      rate: ttsRate,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => {
+        setIsSpeaking(false)
+        setSpeechError('Не удалось озвучить текст на этом устройстве.')
+      },
+    })
+    if (!stop) {
+      setSpeechError('В браузере нет английского голоса.')
+      return
+    }
+    stopSpeechRef.current = stop
+  }
+
+  function playDictionaryAudio(audioURL: string, fallbackText: string) {
+    setSpeechError(null)
+    stopSpeech()
+
+    const audio = new Audio(audioURL)
+    let stopped = false
+    let fallbackStarted = false
+    const fallbackToBrowser = () => {
+      if (stopped || fallbackStarted) return
+      fallbackStarted = true
+      speakWithBrowser(fallbackText)
+    }
+
+    audio.addEventListener('ended', () => setIsSpeaking(false), { once: true })
+    audio.addEventListener('error', fallbackToBrowser, { once: true })
+    stopSpeechRef.current = () => {
+      stopped = true
+      audio.pause()
+      audio.currentTime = 0
+    }
+    setIsSpeaking(true)
+    void audio.play().catch(fallbackToBrowser)
+  }
+
+  function speakSelection(kind: 'word' | 'context' | 'sentence') {
+    if (!selection) return
+    const text =
+      kind === 'word'
+        ? selection.word
+        : kind === 'context'
+          ? selection.translationText
+          : selection.fullSentence
+    if (!text) return
+
+    if (kind === 'word') {
+      const audioURL = dictionary.data
+        ?.getPronunciationsList()
+        .find((pronunciation) => pronunciation.getAudioUrl())
+        ?.getAudioUrl()
+      if (audioURL) {
+        playDictionaryAudio(audioURL, text)
+        return
+      }
+    }
+
+    speakWithBrowser(text)
   }
 
   function saveSelectedWord() {
@@ -439,6 +552,42 @@ export function ReaderPage() {
               </label>
             ))}
           </fieldset>
+          <label>
+            Английский голос
+            <select
+              value={
+                voices.some((voice) => voice.voiceURI === ttsVoiceURI)
+                  ? ttsVoiceURI
+                  : ''
+              }
+              disabled={!speechSynthesisSupported() || voices.length === 0}
+              onChange={(event) => setTTSVoiceURI(event.target.value)}
+            >
+              <option value="">Автоматически (en-US)</option>
+              {voices.map((voice) => (
+                <option key={voice.voiceURI} value={voice.voiceURI}>
+                  {voice.name} ({voice.lang})
+                </option>
+              ))}
+            </select>
+            {!speechSynthesisSupported() && (
+              <small>Этот браузер не поддерживает озвучивание.</small>
+            )}
+            {speechSynthesisSupported() && voices.length === 0 && (
+              <small>В браузере нет доступного английского голоса.</small>
+            )}
+          </label>
+          <label>
+            Скорость озвучивания: {ttsRate.toFixed(1)}×
+            <input
+              type="range"
+              min="0.6"
+              max="1.2"
+              step="0.1"
+              value={ttsRate}
+              onChange={(event) => setTTSRate(Number(event.target.value))}
+            />
+          </label>
           <button
             className="button button-secondary"
             type="button"
@@ -478,7 +627,10 @@ export function ReaderPage() {
         {selection && (
           <div
             className="modal-backdrop"
-            onMouseDown={() => setSelection(null)}
+            onMouseDown={() => {
+              stopSpeech()
+              setSelection(null)
+            }}
           >
             <section
               className="translation-panel"
@@ -504,6 +656,40 @@ export function ReaderPage() {
               {dictionary.data && (
                 <>
                   <h3>{dictionary.data.getNormalizedLemma()}</h3>
+                  {(() => {
+                    const americanPronunciations = dictionary.data
+                      .getPronunciationsList()
+                      .filter((pronunciation) => {
+                        const accents = pronunciation
+                          .getAccent()
+                          .toLowerCase()
+                          .split(',')
+                          .map((accent) => accent.trim())
+                        return (
+                          accents.includes('us') ||
+                          accents.includes('general-american')
+                        )
+                      })
+                      .sort((left, right) => {
+                        const priority = (accent: string) => {
+                          const normalized = accent.toLowerCase()
+                          if (normalized === 'general-american') return 0
+                          if (normalized === 'us') return 1
+                          if (normalized.includes('general-american')) return 2
+                          return 3
+                        }
+                        return (
+                          priority(left.getAccent()) -
+                          priority(right.getAccent())
+                        )
+                      })
+                    const ipa = americanPronunciations
+                      .find((pronunciation) => pronunciation.getIpa())
+                      ?.getIpa()
+                    return ipa ? (
+                      <p className="pronunciation-ipa">{ipa}</p>
+                    ) : null
+                  })()}
                   {groupSenses(dictionary.data.getSensesList()).map((sense) => (
                     <div key={sense.partOfSpeech}>
                       <p>
@@ -567,6 +753,57 @@ export function ReaderPage() {
                       К короткому контексту
                     </button>
                   )}
+                  <section className="speech-controls" aria-label="Озвучивание">
+                    <p>Озвучивание</p>
+                    {isSpeaking ? (
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={stopSpeech}
+                      >
+                        Остановить
+                      </button>
+                    ) : (
+                      <div className="speech-mode-buttons">
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          onClick={() => speakSelection('word')}
+                        >
+                          Слово
+                        </button>
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          disabled={
+                            !speechSynthesisSupported() || voices.length === 0
+                          }
+                          onClick={() => speakSelection('context')}
+                        >
+                          Контекст
+                        </button>
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          disabled={
+                            !speechSynthesisSupported() || voices.length === 0
+                          }
+                          onClick={() => speakSelection('sentence')}
+                        >
+                          Предложение
+                        </button>
+                      </div>
+                    )}
+                    {!speechSynthesisSupported() || voices.length === 0 ? (
+                      <p className="reader-error">
+                        Контекст и предложение требуют английского голоса в
+                        браузере.
+                      </p>
+                    ) : null}
+                    {speechError && (
+                      <p className="reader-error">{speechError}</p>
+                    )}
+                  </section>
                   {groupSenses(dictionary.data.getSensesList()).map((sense) => (
                     <div key={`examples-${sense.partOfSpeech}`}>
                       {sense.examples.map((example) => (
@@ -612,7 +849,10 @@ export function ReaderPage() {
               <button
                 className="text-button"
                 type="button"
-                onClick={() => setSelection(null)}
+                onClick={() => {
+                  stopSpeech()
+                  setSelection(null)
+                }}
               >
                 Закрыть
               </button>

@@ -34,6 +34,8 @@ type Settings struct {
 	Theme          string  `json:"theme"`
 	LineHeight     float64 `json:"line_height"`
 	HighlightColor string  `json:"highlight_color"`
+	TTSVoiceURI    string  `json:"tts_voice_uri"`
+	TTSRate        float64 `json:"tts_rate"`
 }
 type State struct {
 	Chapter  Chapter  `json:"chapter"`

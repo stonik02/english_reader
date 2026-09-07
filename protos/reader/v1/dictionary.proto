@@ -41,6 +41,15 @@ message SourceMetadata {
   string source_version = 2;
 }
 
+message Pronunciation {
+  string ipa = 1;
+  string accent = 2;
+  string audio_url = 3;
+  string source_url = 4;
+  string attribution = 5;
+  string license = 6;
+}
+
 message LookupWordResponse {
   string normalized_lemma = 1;
   repeated DictionarySense senses = 2;
@@ -49,6 +58,7 @@ message LookupWordResponse {
   SourceMetadata source = 5;
   bool already_saved = 6;
   int64 lemma_id = 7;
+  repeated Pronunciation pronunciations = 8;
 }
 
 message TranslateTextRequest {

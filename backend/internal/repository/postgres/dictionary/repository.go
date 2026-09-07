@@ -59,6 +59,24 @@ func (r *Repository) Lookup(ctx context.Context, lemma string) (domain.LookupRes
 	if err := rows.Err(); err != nil {
 		return result, err
 	}
+	if result.LemmaID == 0 {
+		return result, nil
+	}
+	pronunciations, err := r.pool.Query(ctx, `SELECT ipa,accent,audio_url,source_url,attribution,license FROM dictionary_pronunciations WHERE lemma_id=$1 ORDER BY id`, result.LemmaID)
+	if err != nil {
+		return result, err
+	}
+	defer pronunciations.Close()
+	for pronunciations.Next() {
+		var pronunciation domain.Pronunciation
+		if err := pronunciations.Scan(&pronunciation.IPA, &pronunciation.Accent, &pronunciation.AudioURL, &pronunciation.SourceURL, &pronunciation.Attribution, &pronunciation.License); err != nil {
+			return result, err
+		}
+		result.Pronunciations = append(result.Pronunciations, pronunciation)
+	}
+	if err := pronunciations.Err(); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 

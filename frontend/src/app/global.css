@@ -965,6 +965,32 @@ input {
   border-left: 3px solid #d7cfbc;
   background: #f7f2e8;
 }
+.pronunciation-ipa {
+  margin: 6px 0 14px;
+  color: #625d51;
+  font-family: 'Noto Sans', 'Arial Unicode MS', sans-serif;
+  font-size: 1.08em;
+}
+.speech-controls {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #d7cfbc;
+  border-radius: 8px;
+  background: #f8f5ed;
+}
+.speech-controls p {
+  margin: 0;
+}
+.speech-mode-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.speech-mode-buttons .button {
+  min-height: 36px;
+}
 .translation-context p {
   margin: 0;
 }

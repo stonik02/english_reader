@@ -41,7 +41,7 @@ func (u *UseCase) Execute(ctx context.Context, request Request) (domain.LookupRe
 			break
 		}
 	}
-	response := domain.LookupResponse{LemmaID: result.LemmaID, NormalizedLemma: lemma, Senses: result.Senses, Source: result.Source, SourceVersion: result.SourceVersion}
+	response := domain.LookupResponse{LemmaID: result.LemmaID, NormalizedLemma: lemma, Senses: result.Senses, Pronunciations: result.Pronunciations, Source: result.Source, SourceVersion: result.SourceVersion}
 	if result.LemmaID != 0 {
 		alreadySaved, savedErr := u.vocabulary.IsSaved(ctx, request.UserID, result.LemmaID)
 		if savedErr != nil {

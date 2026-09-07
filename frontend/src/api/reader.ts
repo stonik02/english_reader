@@ -75,11 +75,15 @@ export async function updateReaderSettings({
   theme,
   lineHeight,
   highlightColor,
+  ttsVoiceURI,
+  ttsRate,
 }: {
   fontScale: number
   theme: string
   lineHeight: number
   highlightColor: string
+  ttsVoiceURI: string
+  ttsRate: number
 }) {
   return unaryCall(() => {
     const request = new UpdateReaderSettingsRequest()
@@ -89,6 +93,8 @@ export async function updateReaderSettings({
     if (typeof request.setHighlightColor === 'function') {
       request.setHighlightColor(highlightColor)
     }
+    request.setTtsVoiceUri(ttsVoiceURI)
+    request.setTtsRate(ttsRate)
     request.setAccessToken(sessionToken.get() ?? '')
     return readerClient.updateReaderSettings(request, authorizationMetadata())
   })

@@ -87,6 +87,12 @@ export class ReaderSettings extends jspb.Message {
   getHighlightColor(): string;
   setHighlightColor(value: string): ReaderSettings;
 
+  getTtsVoiceUri(): string;
+  setTtsVoiceUri(value: string): ReaderSettings;
+
+  getTtsRate(): number;
+  setTtsRate(value: number): ReaderSettings;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): ReaderSettings.AsObject;
   static toObject(includeInstance: boolean, msg: ReaderSettings): ReaderSettings.AsObject;
@@ -101,6 +107,8 @@ export namespace ReaderSettings {
     theme: string,
     lineHeight: number,
     highlightColor: string,
+    ttsVoiceUri: string,
+    ttsRate: number,
   }
 }
 
@@ -290,6 +298,12 @@ export class UpdateReaderSettingsRequest extends jspb.Message {
   getHighlightColor(): string;
   setHighlightColor(value: string): UpdateReaderSettingsRequest;
 
+  getTtsVoiceUri(): string;
+  setTtsVoiceUri(value: string): UpdateReaderSettingsRequest;
+
+  getTtsRate(): number;
+  setTtsRate(value: number): UpdateReaderSettingsRequest;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): UpdateReaderSettingsRequest.AsObject;
   static toObject(includeInstance: boolean, msg: UpdateReaderSettingsRequest): UpdateReaderSettingsRequest.AsObject;
@@ -305,6 +319,8 @@ export namespace UpdateReaderSettingsRequest {
     theme: string,
     lineHeight: number,
     highlightColor: string,
+    ttsVoiceUri: string,
+    ttsRate: number,
   }
 }
 

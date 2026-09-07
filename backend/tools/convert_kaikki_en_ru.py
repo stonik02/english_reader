@@ -158,6 +158,52 @@ def source_sense(label: str, senses: list[dict[str, Any]], fallback_index: int) 
     return senses[min(fallback_index, len(senses) - 1)]
 
 
+def pronunciations(entry: dict[str, Any]) -> list[dict[str, str]]:
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for sound in entry.get("sounds", []):
+        if not isinstance(sound, dict):
+            continue
+        ipa = sound.get("ipa")
+        ipa = ipa if isinstance(ipa, str) else ""
+        audio_url = next(
+            (
+                value
+                for key in ("mp3_url", "ogg_url", "wav_url")
+                if isinstance((value := sound.get(key)), str)
+                and value.startswith("https://")
+            ),
+            "",
+        )
+        filename = sound.get("audio")
+        filename = filename if isinstance(filename, str) else ""
+        if not ipa and not audio_url:
+            continue
+        tags = sound.get("tags", [])
+        accent = ", ".join(tag for tag in tags if isinstance(tag, str)) if isinstance(tags, list) else ""
+        source_url = (
+            "https://commons.wikimedia.org/wiki/File:"
+            + quote(filename.replace(" ", "_"), safe="")
+            if filename
+            else SOURCE_URL.format(quote(str(entry["word"]).replace(" ", "_"), safe=""))
+        )
+        key = (ipa, accent, audio_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            {
+                "ipa": ipa,
+                "accent": accent,
+                "audio_url": audio_url,
+                "source_url": source_url,
+                "attribution": "Wiktionary contributors; audio attribution is on the source file page",
+                "license": "See the source file page",
+            }
+        )
+    return result
+
+
 def records(entry: dict[str, Any], version: str, include_phrases: bool) -> Iterator[dict[str, Any]]:
     part_of_speech = PARTS_OF_SPEECH.get(entry.get("pos"))
     if entry.get("lang_code") != "en" or part_of_speech is None:
@@ -173,6 +219,7 @@ def records(entry: dict[str, Any], version: str, include_phrases: bool) -> Itera
         return
 
     position = 0
+    pronunciation_data = pronunciations(entry)
     for index, (label, translations) in enumerate(groups.items()):
         sense = source_sense(label, senses, index)
         yield {
@@ -186,6 +233,7 @@ def records(entry: dict[str, Any], version: str, include_phrases: bool) -> Itera
             "attribution": ATTRIBUTION,
             "position": position,
             "source_version": version,
+            "pronunciations": pronunciation_data,
         }
         position += 1
 

@@ -19,7 +19,7 @@ func TestUseCaseRejectsInvalidSettings(t *testing.T) {
 func TestUseCaseExecute(t *testing.T) {
 	controller := gomock.NewController(t)
 	repository := NewMockSettingsRepository(controller)
-	value := domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: "yellow"}
+	value := domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: "yellow", TTSRate: 0.9}
 	repository.EXPECT().UpdateSettings(gomock.Any(), "user-1", value).Return(value, nil)
 	if _, err := New(repository).Execute(context.Background(), "user-1", value); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -31,7 +31,7 @@ func TestUseCaseAcceptsSubtleAndDisabledHighlights(t *testing.T) {
 		t.Run(color, func(t *testing.T) {
 			controller := gomock.NewController(t)
 			repository := NewMockSettingsRepository(controller)
-			value := domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: color}
+			value := domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: color, TTSRate: 0.9}
 			repository.EXPECT().UpdateSettings(gomock.Any(), "user-1", value).Return(value, nil)
 
 			_, err := New(repository).Execute(context.Background(), "user-1", value)
@@ -44,7 +44,15 @@ func TestUseCaseAcceptsSubtleAndDisabledHighlights(t *testing.T) {
 
 func TestUseCaseRejectsUnknownHighlightColor(t *testing.T) {
 	controller := gomock.NewController(t)
-	_, err := New(NewMockSettingsRepository(controller)).Execute(context.Background(), "user-1", domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: "black"})
+	_, err := New(NewMockSettingsRepository(controller)).Execute(context.Background(), "user-1", domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: "black", TTSRate: 0.9})
+	if err != domain.ErrInvalidInput {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestUseCaseRejectsInvalidTTSRate(t *testing.T) {
+	controller := gomock.NewController(t)
+	_, err := New(NewMockSettingsRepository(controller)).Execute(context.Background(), "user-1", domain.Settings{FontScale: 100, Theme: "system", LineHeight: 1.5, HighlightColor: "yellow", TTSRate: 1.3})
 	if err != domain.ErrInvalidInput {
 		t.Fatalf("error = %v", err)
 	}
