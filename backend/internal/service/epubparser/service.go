@@ -12,12 +12,14 @@ import (
 	"strings"
 
 	domain "github.com/deniskrylov/english-reader/backend/internal/domain/library"
+	xhtml "golang.org/x/net/html"
 )
 
 const (
 	maxFiles        = 2_000
 	maxUnpackedSize = 200 << 20
 	maxChapterSize  = 5 << 20
+	targetPartSize  = 128 << 10
 	maxCoverSize    = 5 << 20
 	minimumEPUBMIME = "application/epub+zip"
 )
@@ -110,19 +112,25 @@ func (s *Service) Parse(sourcePath, bookID string) (Result, error) {
 			return Result{}, domain.ErrInvalidUpload
 		}
 		sanitized := embedImages(sanitize(string(content)), files, path.Dir(href))
-		chapterText := plainText(sanitized)
-		if chapterText == "" {
-			continue
+		for part, chapterHTML := range splitChapter(sanitized) {
+			chapterText := plainText(chapterHTML)
+			if chapterText == "" {
+				continue
+			}
+			chapterHref := href
+			if part > 0 {
+				chapterHref = fmt.Sprintf("%s#part-%d", href, part+1)
+			}
+			result.Chapters = append(result.Chapters, domain.Chapter{
+				BookID:        bookID,
+				Sequence:      len(result.Chapters),
+				Href:          chapterHref,
+				StartCFI:      fmt.Sprintf("epubcfi(/6/%d/%d)", sequence+2, part+1),
+				EndCFI:        fmt.Sprintf("epubcfi(/6/%d/%d)", sequence+4, part+1),
+				SanitizedHTML: chapterHTML,
+				PlainText:     chapterText,
+			})
 		}
-		result.Chapters = append(result.Chapters, domain.Chapter{
-			BookID:        bookID,
-			Sequence:      len(result.Chapters),
-			Href:          href,
-			StartCFI:      fmt.Sprintf("epubcfi(/6/%d)", sequence+2),
-			EndCFI:        fmt.Sprintf("epubcfi(/6/%d)", sequence+4),
-			SanitizedHTML: sanitized,
-			PlainText:     chapterText,
-		})
 	}
 	if len(result.Chapters) == 0 {
 		return Result{}, domain.ErrInvalidUpload
@@ -133,6 +141,100 @@ func (s *Service) Parse(sourcePath, bookID string) (Result, error) {
 	}
 	result.Cover = cover
 	return result, nil
+}
+
+// splitChapter keeps each response reasonably small without cutting inside an
+// HTML node. EPUB files commonly put an entire book chapter into one spine
+// document; sending that document as one response blocks rendering in the
+// browser. Nodes that are individually larger than the target remain intact:
+// preserving a valid image/table is more important than an unsafe byte split.
+func splitChapter(value string) []string {
+	document, err := xhtml.Parse(strings.NewReader(value))
+	if err != nil {
+		return []string{value}
+	}
+	body := findElement(document, "body")
+	if body == nil {
+		return []string{value}
+	}
+
+	parts, ok := splitChildren(body.FirstChild, "", "")
+	if !ok || len(parts) == 0 {
+		return []string{value}
+	}
+	return parts
+}
+
+func splitChildren(first *xhtml.Node, prefix, suffix string) ([]string, bool) {
+	parts := make([]string, 0, 1)
+	current := prefix
+	hasContent := false
+	for node := first; node != nil; node = node.NextSibling {
+		nodeParts, ok := splitNode(node)
+		if !ok {
+			return nil, false
+		}
+		for _, part := range nodeParts {
+			if hasContent && len(current)+len(part)+len(suffix) > targetPartSize {
+				parts = append(parts, current+suffix)
+				current = prefix
+				hasContent = false
+			}
+			current += part
+			hasContent = true
+		}
+	}
+	if hasContent {
+		parts = append(parts, current+suffix)
+	}
+	return parts, true
+}
+
+func splitNode(node *xhtml.Node) ([]string, bool) {
+	rendered, ok := renderNode(node)
+	if !ok || len(rendered) <= targetPartSize || node.Type != xhtml.ElementNode || node.FirstChild == nil {
+		return []string{rendered}, ok
+	}
+	return splitChildren(node.FirstChild, openingTag(node), "</"+node.Data+">")
+}
+
+func renderNode(node *xhtml.Node) (string, bool) {
+	var rendered strings.Builder
+	if err := xhtml.Render(&rendered, node); err != nil {
+		return "", false
+	}
+	return rendered.String(), true
+}
+
+func openingTag(node *xhtml.Node) string {
+	var value strings.Builder
+	value.WriteByte('<')
+	value.WriteString(node.Data)
+	for _, attribute := range node.Attr {
+		value.WriteByte(' ')
+		if attribute.Namespace != "" {
+			value.WriteString(attribute.Namespace)
+			value.WriteByte(':')
+		}
+		value.WriteString(attribute.Key)
+		value.WriteString(`="`)
+		value.WriteString(html.EscapeString(attribute.Val))
+		value.WriteByte('"')
+	}
+	value.WriteByte('>')
+	return value.String()
+}
+
+func findElement(node *xhtml.Node, name string) *xhtml.Node {
+	if node.Type == xhtml.ElementNode && node.Data == name {
+		return node
+	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if found := findElement(child, name); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 func parseCover(opf []byte, files map[string]*zip.File, opfPath string) (*Cover, error) {

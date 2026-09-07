@@ -12,7 +12,6 @@ package lookupword
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	dictionary "github.com/deniskrylov/english-reader/backend/internal/domain/dictionary"
 	gomock "go.uber.org/mock/gomock"
@@ -119,22 +118,6 @@ func (m *MockDictionaryRepository) EXPECT() *MockDictionaryRepositoryMockRecorde
 	return m.recorder
 }
 
-// CachedTranslation mocks base method.
-func (m *MockDictionaryRepository) CachedTranslation(arg0 context.Context, arg1, arg2 string) (dictionary.CachedTranslation, bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CachedTranslation", arg0, arg1, arg2)
-	ret0, _ := ret[0].(dictionary.CachedTranslation)
-	ret1, _ := ret[1].(bool)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// CachedTranslation indicates an expected call of CachedTranslation.
-func (mr *MockDictionaryRepositoryMockRecorder) CachedTranslation(arg0, arg1, arg2 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CachedTranslation", reflect.TypeOf((*MockDictionaryRepository)(nil).CachedTranslation), arg0, arg1, arg2)
-}
-
 // Lookup mocks base method.
 func (m *MockDictionaryRepository) Lookup(arg0 context.Context, arg1 string) (dictionary.LookupResult, error) {
 	m.ctrl.T.Helper()
@@ -148,98 +131,6 @@ func (m *MockDictionaryRepository) Lookup(arg0 context.Context, arg1 string) (di
 func (mr *MockDictionaryRepositoryMockRecorder) Lookup(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lookup", reflect.TypeOf((*MockDictionaryRepository)(nil).Lookup), arg0, arg1)
-}
-
-// PutTranslation mocks base method.
-func (m *MockDictionaryRepository) PutTranslation(arg0 context.Context, arg1, arg2, arg3 string, arg4 time.Duration) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutTranslation", arg0, arg1, arg2, arg3, arg4)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// PutTranslation indicates an expected call of PutTranslation.
-func (mr *MockDictionaryRepositoryMockRecorder) PutTranslation(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutTranslation", reflect.TypeOf((*MockDictionaryRepository)(nil).PutTranslation), arg0, arg1, arg2, arg3, arg4)
-}
-
-// MockTranslationProvider is a mock of TranslationProvider interface.
-type MockTranslationProvider struct {
-	ctrl     *gomock.Controller
-	recorder *MockTranslationProviderMockRecorder
-	isgomock struct{}
-}
-
-// MockTranslationProviderMockRecorder is the mock recorder for MockTranslationProvider.
-type MockTranslationProviderMockRecorder struct {
-	mock *MockTranslationProvider
-}
-
-// NewMockTranslationProvider creates a new mock instance.
-func NewMockTranslationProvider(ctrl *gomock.Controller) *MockTranslationProvider {
-	mock := &MockTranslationProvider{ctrl: ctrl}
-	mock.recorder = &MockTranslationProviderMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockTranslationProvider) EXPECT() *MockTranslationProviderMockRecorder {
-	return m.recorder
-}
-
-// Translate mocks base method.
-func (m *MockTranslationProvider) Translate(arg0 context.Context, arg1 string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Translate", arg0, arg1)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Translate indicates an expected call of Translate.
-func (mr *MockTranslationProviderMockRecorder) Translate(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Translate", reflect.TypeOf((*MockTranslationProvider)(nil).Translate), arg0, arg1)
-}
-
-// MockReaderPort is a mock of ReaderPort interface.
-type MockReaderPort struct {
-	ctrl     *gomock.Controller
-	recorder *MockReaderPortMockRecorder
-	isgomock struct{}
-}
-
-// MockReaderPortMockRecorder is the mock recorder for MockReaderPort.
-type MockReaderPortMockRecorder struct {
-	mock *MockReaderPort
-}
-
-// NewMockReaderPort creates a new mock instance.
-func NewMockReaderPort(ctrl *gomock.Controller) *MockReaderPort {
-	mock := &MockReaderPort{ctrl: ctrl}
-	mock.recorder = &MockReaderPortMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockReaderPort) EXPECT() *MockReaderPortMockRecorder {
-	return m.recorder
-}
-
-// ChapterPlainText mocks base method.
-func (m *MockReaderPort) ChapterPlainText(arg0 context.Context, arg1, arg2 string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ChapterPlainText", arg0, arg1, arg2)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ChapterPlainText indicates an expected call of ChapterPlainText.
-func (mr *MockReaderPortMockRecorder) ChapterPlainText(arg0, arg1, arg2 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChapterPlainText", reflect.TypeOf((*MockReaderPort)(nil).ChapterPlainText), arg0, arg1, arg2)
 }
 
 // MockVocabularyReader is a mock of VocabularyReader interface.

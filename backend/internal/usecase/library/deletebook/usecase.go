@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	domain "github.com/deniskrylov/english-reader/backend/internal/domain/library"
 )
 
 type UseCase struct {
@@ -16,7 +18,14 @@ func New(books Books, storage Storage) *UseCase {
 	return &UseCase{books: books, storage: storage}
 }
 
-func (u *UseCase) Execute(ctx context.Context, bookID string) error {
+func (u *UseCase) Execute(ctx context.Context, userID, bookID string) error {
+	allowed, err := u.books.CanDelete(ctx, userID, bookID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return domain.ErrForbidden
+	}
 	files, err := u.books.Delete(ctx, bookID)
 	if err != nil {
 		return err

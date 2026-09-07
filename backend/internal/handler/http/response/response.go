@@ -39,6 +39,8 @@ func LibraryError(w http.ResponseWriter, err error) {
 		Write(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	case errors.Is(err, library.ErrTooLarge):
 		Write(w, http.StatusRequestEntityTooLarge, map[string]string{"error": err.Error()})
+	case errors.Is(err, library.ErrForbidden), errors.Is(err, library.ErrUploadLimit):
+		Write(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 	default:
 		Write(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}

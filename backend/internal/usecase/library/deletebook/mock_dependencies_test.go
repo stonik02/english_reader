@@ -41,6 +41,21 @@ func (m *MockBooks) EXPECT() *MockBooksMockRecorder {
 	return m.recorder
 }
 
+// CanDelete mocks base method.
+func (m *MockBooks) CanDelete(arg0 context.Context, arg1, arg2 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CanDelete", arg0, arg1, arg2)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CanDelete indicates an expected call of CanDelete.
+func (mr *MockBooksMockRecorder) CanDelete(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanDelete", reflect.TypeOf((*MockBooks)(nil).CanDelete), arg0, arg1, arg2)
+}
+
 // Delete mocks base method.
 func (m *MockBooks) Delete(arg0 context.Context, arg1 string) (library.StoredBookFiles, error) {
 	m.ctrl.T.Helper()

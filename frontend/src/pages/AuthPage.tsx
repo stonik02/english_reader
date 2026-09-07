@@ -6,6 +6,8 @@ import { useAuth } from '../features/auth/useAuth'
 
 type AuthPageProps = { mode: 'login' | 'register' }
 
+const minimumPasswordLength = 8
+
 export function AuthPage({ mode }: AuthPageProps) {
   const isLogin = mode === 'login'
   const { login, register, status } = useAuth()
@@ -82,7 +84,7 @@ export function AuthPage({ mode }: AuthPageProps) {
             Пароль
             <input
               autoComplete={isLogin ? 'current-password' : 'new-password'}
-              minLength={12}
+              minLength={isLogin ? undefined : minimumPasswordLength}
               name="password"
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -95,7 +97,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               Повторите пароль
               <input
                 autoComplete="new-password"
-                minLength={12}
+                minLength={minimumPasswordLength}
                 name="passwordConfirmation"
                 onChange={(event) =>
                   setPasswordConfirmation(event.target.value)

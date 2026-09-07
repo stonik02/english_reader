@@ -8,7 +8,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help infra-up infra-down app-up app-down logs ps run build test test-race test-docker test-db-up test-db-down test-repository dictionary-convert dictionary-import book-reprocess mocks fmt vet tidy migrate-up migrate-down proto proto-lint
+.PHONY: help infra-up infra-down app-up app-down logs ps run build test test-race test-docker test-db-up test-db-down test-repository dictionary-convert dictionary-import book-reprocess grant-admin mocks fmt vet tidy migrate-up migrate-down proto proto-lint
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "%-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -62,6 +62,10 @@ dictionary-import: ## Import JSONL; set DATABASE_URL (or .env), DICTIONARY_FILE 
 
 book-reprocess: ## Reparse stored EPUBs; set DATABASE_URL and REPROCESS_ALL=true or REPROCESS_BOOK_ID
 	go run ./cmd/book-reprocess $(if $(REPROCESS_ALL),-all,-book-id "$(REPROCESS_BOOK_ID)")
+
+grant-admin: ## Grant admin to an existing user; set ADMIN_EMAIL and CONFIRM=true
+	@test "$(CONFIRM)" = "true" || (echo 'set CONFIRM=true after verifying ADMIN_EMAIL' && exit 2)
+	go run ./cmd/grant-admin -email "$(ADMIN_EMAIL)" -confirm
 
 dictionary-convert: ## Convert Kaikki English dump; set KAIKKI_FILE, DICTIONARY_FILE and DICTIONARY_VERSION
 	python3 tools/convert_kaikki_en_ru.py --input "$(KAIKKI_FILE)" --output "$(DICTIONARY_FILE)" --version "$(DICTIONARY_VERSION)"

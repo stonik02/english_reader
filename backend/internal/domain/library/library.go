@@ -10,6 +10,8 @@ var (
 	ErrNotReady      = errors.New("book is not ready")
 	ErrInvalidUpload = errors.New("invalid EPUB upload")
 	ErrTooLarge      = errors.New("EPUB is too large")
+	ErrForbidden     = errors.New("book action is not permitted")
+	ErrUploadLimit   = errors.New("book upload limit reached")
 )
 
 type Book struct {

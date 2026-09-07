@@ -348,7 +348,8 @@ proto.reader.v1.User.toObject = function(includeInstance, msg) {
   var f, obj = {
 id: jspb.Message.getFieldWithDefault(msg, 1, ""),
 email: jspb.Message.getFieldWithDefault(msg, 2, ""),
-createdAt: jspb.Message.getFieldWithDefault(msg, 3, "")
+createdAt: jspb.Message.getFieldWithDefault(msg, 3, ""),
+role: jspb.Message.getFieldWithDefault(msg, 4, "")
   };
 
   if (includeInstance) {
@@ -397,6 +398,10 @@ proto.reader.v1.User.deserializeBinaryFromReader = function(msg, reader) {
       var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setCreatedAt(value);
       break;
+    case 4:
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
+      msg.setRole(value);
+      break;
     default:
       reader.skipField();
       break;
@@ -444,6 +449,13 @@ proto.reader.v1.User.serializeBinaryToWriter = function(message, writer) {
   if (f.length > 0) {
     writer.writeString(
       3,
+      f
+    );
+  }
+  f = message.getRole();
+  if (f.length > 0) {
+    writer.writeString(
+      4,
       f
     );
   }
@@ -501,6 +513,24 @@ proto.reader.v1.User.prototype.getCreatedAt = function() {
  */
 proto.reader.v1.User.prototype.setCreatedAt = function(value) {
   return jspb.Message.setProto3StringField(this, 3, value);
+};
+
+
+/**
+ * optional string role = 4;
+ * @return {string}
+ */
+proto.reader.v1.User.prototype.getRole = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 4, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.reader.v1.User} returns this
+ */
+proto.reader.v1.User.prototype.setRole = function(value) {
+  return jspb.Message.setProto3StringField(this, 4, value);
 };
 
 

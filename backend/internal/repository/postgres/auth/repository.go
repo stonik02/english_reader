@@ -24,7 +24,7 @@ func (r *Repository) CreateUserWithSession(c context.Context, email, pass string
 
 	defer tx.Rollback(c)
 
-	u := domain.User{ID: uuid.NewString(), Email: email, CreatedAt: time.Now()}
+	u := domain.User{ID: uuid.NewString(), Email: email, Role: "user", CreatedAt: time.Now()}
 
 	_, e = tx.Exec(c, `INSERT INTO users (id,email,password_hash) VALUES ($1,$2,$3)`, u.ID, email, pass)
 	if e != nil {
@@ -48,8 +48,8 @@ func (r *Repository) FindUserByEmail(c context.Context, email string) (domain.Us
 	var u domain.User
 	var p string
 
-	e := r.pool.QueryRow(c, `SELECT id,email,created_at,password_hash FROM users WHERE email=$1 AND deleted_at IS NULL`, email).
-		Scan(&u.ID, &u.Email, &u.CreatedAt, &p)
+	e := r.pool.QueryRow(c, `SELECT id,email,role::text,created_at,password_hash FROM users WHERE email=$1 AND deleted_at IS NULL`, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt, &p)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return domain.User{}, "", domain.ErrInvalidCredentials
 	}
@@ -59,24 +59,35 @@ func (r *Repository) FindUserByEmail(c context.Context, email string) (domain.Us
 func (r *Repository) FindUserByID(c context.Context, id string) (domain.User, error) {
 	var u domain.User
 
-	e := r.pool.QueryRow(c, `SELECT id,email,created_at FROM users WHERE id=$1 AND deleted_at IS NULL`, id).
-		Scan(&u.ID, &u.Email, &u.CreatedAt)
+	e := r.pool.QueryRow(c, `SELECT id,email,role::text,created_at FROM users WHERE id=$1 AND deleted_at IS NULL`, id).
+		Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return domain.User{}, domain.ErrInvalidCredentials
 	}
 
 	return u, e
 }
+
+func (r *Repository) SetRole(c context.Context, id, role string) error {
+	result, err := r.pool.Exec(c, `UPDATE users SET role=$2::user_role,updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, id, role)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return domain.ErrInvalidCredentials
+	}
+	return nil
+}
 func (r *Repository) FindUserByRefreshHash(c context.Context, h []byte) (domain.User, error) {
 	var u domain.User
 
 	e := r.pool.QueryRow(c, `
-	SELECT u.id,u.email,u.created_at FROM auth_sessions s 
+	SELECT u.id,u.email,u.role::text,u.created_at FROM auth_sessions s
     JOIN users u ON u.id=s.user_id 
 	    WHERE s.refresh_token_hash=$1 AND s.revoked_at IS NULL 
 	      AND s.expires_at>NOW() AND u.deleted_at IS NULL
 	      `, h).
-		Scan(&u.ID, &u.Email, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return domain.User{}, domain.ErrInvalidCredentials
 	}

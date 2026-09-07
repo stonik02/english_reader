@@ -37,7 +37,7 @@ func (u *UseCase) Execute(c context.Context, q Request) (domain.Tokens, error) {
 	email := strings.ToLower(strings.TrimSpace(q.Email))
 
 	parsed, e := mail.ParseAddress(email)
-	if e != nil || parsed.Address != email || len(q.Password) < 12 || len(q.Password) > 256 {
+	if e != nil || parsed.Address != email || len(q.Password) < domain.MinPasswordLength || len(q.Password) > domain.MaxPasswordLength {
 		return domain.Tokens{}, domain.ErrInvalidInput
 	}
 

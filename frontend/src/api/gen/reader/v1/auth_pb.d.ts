@@ -26,6 +26,9 @@ export class User extends jspb.Message {
   getCreatedAt(): string;
   setCreatedAt(value: string): User;
 
+  getRole(): string;
+  setRole(value: string): User;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): User.AsObject;
   static toObject(includeInstance: boolean, msg: User): User.AsObject;
@@ -39,6 +42,7 @@ export namespace User {
     id: string,
     email: string,
     createdAt: string,
+    role: string,
   }
 }
 

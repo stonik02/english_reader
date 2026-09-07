@@ -39,6 +39,8 @@ func Error(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrNotReady):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrUploadLimit):
+		return status.Error(codes.PermissionDenied, err.Error())
 	default:
 		return status.Error(codes.Internal, "internal server error")
 	}

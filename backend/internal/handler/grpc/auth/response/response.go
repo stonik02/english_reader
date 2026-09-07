@@ -23,6 +23,7 @@ func User(user domain.User) *readerv1.User {
 	return &readerv1.User{
 		Id:        user.ID,
 		Email:     user.Email,
+		Role:      user.Role,
 		CreatedAt: user.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

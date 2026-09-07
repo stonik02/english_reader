@@ -17,11 +17,12 @@ func New(usecase UseCase, tokens TokenParser) *Handler {
 	return &Handler{usecase: usecase, tokens: tokens}
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if _, err := identity.Subject(r, h.tokens); err != nil {
+	userID, err := identity.Subject(r, h.tokens)
+	if err != nil {
 		response.Write(w, http.StatusUnauthorized, map[string]string{"error": "invalid access token"})
 		return
 	}
-	if err := h.usecase.Execute(r.Context(), chi.URLParam(r, "bookID")); err != nil {
+	if err := h.usecase.Execute(r.Context(), userID, chi.URLParam(r, "bookID")); err != nil {
 		response.LibraryError(w, err)
 		return
 	}

@@ -7,6 +7,7 @@ import (
 )
 
 type Books interface {
+	CanDelete(context.Context, string, string) (bool, error)
 	Delete(context.Context, string) (domain.StoredBookFiles, error)
 }
 

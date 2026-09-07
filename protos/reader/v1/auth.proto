@@ -13,7 +13,7 @@ service AuthService {
 }
 
 message Empty {}
-message User { string id = 1; string email = 2; string created_at = 3; }
+message User { string id = 1; string email = 2; string created_at = 3; string role = 4; }
 message AuthResponse { User user = 1; string access_token = 2; string refresh_token = 3; int64 access_token_expires_unix = 4; }
 message RegisterRequest { string email = 1; string password = 2; string device_label = 3; }
 message LoginRequest { string email = 1; string password = 2; string device_label = 3; }

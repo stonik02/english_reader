@@ -7,7 +7,7 @@ import { BookCard } from './LibraryPage'
 
 afterEach(cleanup)
 
-function renderCard(status: string) {
+function renderCard(status: string, canDelete = true) {
   const book = new Book()
   book.setId('book-1')
   book.setTitle('Harry Potter')
@@ -18,6 +18,7 @@ function renderCard(status: string) {
       <BookCard
         added={false}
         book={book}
+        canDelete={canDelete}
         isAdding={false}
         isDeleting={false}
         deleteError={false}
@@ -46,6 +47,14 @@ describe('BookCard', () => {
     expect(screen.getByText('Файл не прошёл обработку.')).toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: 'Читать' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides deletion for a book the current user cannot delete', () => {
+    renderCard('ready', false)
+
+    expect(
+      screen.queryByRole('button', { name: 'Удалить книгу' }),
     ).not.toBeInTheDocument()
   })
 })

@@ -17,7 +17,7 @@ func (u *UseCase) Execute(ctx context.Context, userID string, value domain.Setti
 
 func validHighlightColor(value string) bool {
 	switch value {
-	case "yellow", "blue", "green", "pink", "orange", "purple":
+	case "yellow", "blue", "green", "pink", "orange", "purple", "gray-outline", "none":
 		return true
 	default:
 		return false

@@ -41,17 +41,17 @@ func (m *MockUseCase) EXPECT() *MockUseCaseMockRecorder {
 }
 
 // Execute mocks base method.
-func (m *MockUseCase) Execute(arg0 context.Context, arg1 string) error {
+func (m *MockUseCase) Execute(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", arg0, arg1)
+	ret := m.ctrl.Call(m, "Execute", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockUseCaseMockRecorder) Execute(arg0, arg1 any) *gomock.Call {
+func (mr *MockUseCaseMockRecorder) Execute(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockUseCase)(nil).Execute), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockUseCase)(nil).Execute), arg0, arg1, arg2)
 }
 
 // MockTokenParser is a mock of TokenParser interface.

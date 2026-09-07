@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { decorateInteractiveWords } from './decorateInteractiveWords'
+import {
+  decorateInteractiveWords,
+  decorateInteractiveWordsInBatches,
+} from './decorateInteractiveWords'
+
+afterEach(() => vi.useRealTimers())
 
 describe('decorateInteractiveWords', () => {
   it('wraps readable words and leaves code untouched', () => {
@@ -25,5 +30,17 @@ describe('decorateInteractiveWords', () => {
     decorateInteractiveWords(root)
 
     expect(root.querySelectorAll('[data-reader-word]')).toHaveLength(1)
+  })
+
+  it('adds wrappers in deferred batches', () => {
+    vi.useFakeTimers()
+    const root = document.createElement('article')
+    root.textContent = 'One two three'
+
+    decorateInteractiveWordsInBatches(root, 1)
+    expect(root.querySelectorAll('[data-reader-word]')).toHaveLength(0)
+
+    vi.runAllTimers()
+    expect(root.querySelectorAll('[data-reader-word]')).toHaveLength(3)
   })
 })

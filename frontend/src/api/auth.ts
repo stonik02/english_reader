@@ -3,6 +3,7 @@ import { httpApiUrl } from './client'
 export type AuthUser = {
   id: string
   email: string
+  role: 'user' | 'admin'
   created_at: string
 }
 

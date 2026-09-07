@@ -99,6 +99,32 @@ func TestParseExtractsEPUB2MetaCover(t *testing.T) {
 	}
 }
 
+func TestSplitChapterOnlyCutsBetweenHTMLNodes(t *testing.T) {
+	paragraph := `<p><a href="https://example.com">` + strings.Repeat("word ", 30_000) + `</a></p>`
+	parts := splitChapter("<html><body>" + paragraph + paragraph + "</body></html>")
+	if len(parts) != 2 {
+		t.Fatalf("splitChapter() parts = %d, want 2", len(parts))
+	}
+	for index, part := range parts {
+		if !strings.HasPrefix(part, "<p>") || !strings.HasSuffix(part, "</p>") {
+			t.Fatalf("part %d is not a complete paragraph: %q", index, part[:min(len(part), 80)])
+		}
+	}
+}
+
+func TestSplitChapterSplitsLargeContainerAtItsChildren(t *testing.T) {
+	paragraph := `<p>` + strings.Repeat("word ", 20_000) + `</p>`
+	parts := splitChapter(`<html><body><section class="chapter">` + paragraph + paragraph + `</section></body></html>`)
+	if len(parts) != 2 {
+		t.Fatalf("splitChapter() parts = %d, want 2", len(parts))
+	}
+	for index, part := range parts {
+		if !strings.HasPrefix(part, `<section class="chapter">`) || !strings.HasSuffix(part, "</section>") {
+			t.Fatalf("part %d did not preserve section wrapper", index)
+		}
+	}
+}
+
 func writeTestEPUB(t *testing.T, withCover bool) string {
 	return writeTestEPUBWithOPF(t, `<package><metadata><dc:title xmlns:dc="x">Book</dc:title></metadata><manifest><item id="empty" href="empty.xhtml" media-type="application/xhtml+xml"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>`+map[bool]string{true: `<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>`}[withCover]+`</manifest><spine><itemref idref="empty"/><itemref idref="chapter"/></spine></package>`)
 }

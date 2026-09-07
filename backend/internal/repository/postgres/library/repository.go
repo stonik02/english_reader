@@ -22,13 +22,39 @@ func (r *Repository) FindBySHA256(ctx context.Context, hash []byte) (domain.Book
 }
 
 func (r *Repository) Create(ctx context.Context, id, userID, title, path string, hash []byte) (domain.Book, error) {
-	_, err := r.pool.Exec(ctx, `INSERT INTO books (id,uploaded_by_user_id,title,format,status,content_sha256,source_file_path) VALUES ($1,$2,$3,'epub','processing',$4,$5)`, id, userID, title, hash, path)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Book{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var role string
+	if err := tx.QueryRow(ctx, `SELECT role::text FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, userID).Scan(&role); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Book{}, domain.ErrNotFound
+		}
+		return domain.Book{}, err
+	}
+	if role != "admin" {
+		var uploaded int
+		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM books WHERE uploaded_by_user_id=$1`, userID).Scan(&uploaded); err != nil {
+			return domain.Book{}, err
+		}
+		if uploaded >= 10 {
+			return domain.Book{}, domain.ErrUploadLimit
+		}
+	}
+
+	_, err = tx.Exec(ctx, `INSERT INTO books (id,uploaded_by_user_id,title,format,status,content_sha256,source_file_path) VALUES ($1,$2,$3,'epub','processing',$4,$5)`, id, userID, title, hash, path)
 	if err != nil {
 		return domain.Book{}, fmt.Errorf("create book: %w", err)
 	}
-	_, err = r.pool.Exec(ctx, `INSERT INTO ingestion_jobs (id,book_id,state) VALUES ($1,$2,'pending')`, uuid.NewString(), id)
+	_, err = tx.Exec(ctx, `INSERT INTO ingestion_jobs (id,book_id,state) VALUES ($1,$2,'pending')`, uuid.NewString(), id)
 	if err != nil {
 		return domain.Book{}, fmt.Errorf("create ingestion job: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Book{}, err
 	}
 	return r.Get(ctx, id)
 }
@@ -60,11 +86,64 @@ func (r *Repository) CompleteIngestion(ctx context.Context, bookID, title, autho
 		return err
 	}
 	defer tx.Rollback(ctx)
+
+	// Reprocessing replaces chapter rows. Preserve each reader at the same
+	// source document whenever it is still present, instead of letting the
+	// foreign key silently reset everyone to the first chapter.
+	type previousProgress struct {
+		userID string
+		href   string
+	}
+	previous := make([]previousProgress, 0)
+	rows, err := tx.Query(ctx, `
+		SELECT rp.user_id,COALESCE(ch.href,'')
+		FROM reading_progress rp
+		LEFT JOIN book_chapters ch ON ch.id=rp.chapter_id
+		WHERE rp.book_id=$1`, bookID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var value previousProgress
+		if err := rows.Scan(&value.userID, &value.href); err != nil {
+			rows.Close()
+			return err
+		}
+		previous = append(previous, value)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
 	if _, err = tx.Exec(ctx, `DELETE FROM book_chapters WHERE book_id=$1`, bookID); err != nil {
 		return err
 	}
+	chapterIDs := make(map[string]struct {
+		id       string
+		startCFI string
+	}, len(chapters))
 	for _, chapter := range chapters {
-		if _, err = tx.Exec(ctx, `INSERT INTO book_chapters (id,book_id,sequence,href,start_cfi,end_cfi,sanitized_html,plain_text,word_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, uuid.NewString(), bookID, chapter.Sequence, chapter.Href, chapter.StartCFI, chapter.EndCFI, chapter.SanitizedHTML, chapter.PlainText, len(strings.Fields(chapter.PlainText))); err != nil {
+		chapterID := uuid.NewString()
+		if _, err = tx.Exec(ctx, `INSERT INTO book_chapters (id,book_id,sequence,href,start_cfi,end_cfi,sanitized_html,plain_text,word_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, chapterID, bookID, chapter.Sequence, chapter.Href, chapter.StartCFI, chapter.EndCFI, chapter.SanitizedHTML, chapter.PlainText, len(strings.Fields(chapter.PlainText))); err != nil {
+			return err
+		}
+		chapterIDs[chapter.Href] = struct {
+			id       string
+			startCFI string
+		}{id: chapterID, startCFI: chapter.StartCFI}
+	}
+	if len(chapters) == 0 {
+		return domain.ErrInvalidUpload
+	}
+	first := chapterIDs[chapters[0].Href]
+	for _, value := range previous {
+		target, ok := chapterIDs[value.href]
+		if !ok {
+			target = first
+		}
+		if _, err = tx.Exec(ctx, `UPDATE reading_progress SET chapter_id=$3,epub_cfi=$4,updated_at=NOW() WHERE user_id=$1 AND book_id=$2`, value.userID, bookID, target.id, target.startCFI); err != nil {
 			return err
 		}
 	}
@@ -198,6 +277,19 @@ func (r *Repository) Delete(ctx context.Context, bookID string) (domain.StoredBo
 		return domain.StoredBookFiles{}, err
 	}
 	return files, nil
+}
+
+func (r *Repository) CanDelete(ctx context.Context, userID, bookID string) (bool, error) {
+	var allowed bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT b.uploaded_by_user_id=$1::uuid OR u.role='admin'
+		FROM books b
+		JOIN users u ON u.id=$1::uuid AND u.deleted_at IS NULL
+		WHERE b.id=$2::uuid`, userID, bookID).Scan(&allowed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, domain.ErrNotFound
+	}
+	return allowed, err
 }
 
 func (r *Repository) findBook(ctx context.Context, query string, value any) (domain.Book, error) {

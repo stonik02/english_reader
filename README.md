@@ -102,6 +102,7 @@ LibreTranslate получает один запрос с тайм-аутом 2 �
 ## Документация
 
 - [Архитектура frontend](docs/FRONTEND_ARCHITECTURE.md)
+- [Журнал доработки ридера и перевода от 2026-09-04](docs/SESSION_2026-09-04_READER_TRANSLATION.md)
 - [План ближайших доработок книг](docs/plans/NEXT_SESSION_PLAN_1_DONE.md)
 - [Карта экранов](frontend/docs/SCREENS.md)
 - [План разработки frontend](frontend/docs/IMPLEMENTATION_PLAN.md)

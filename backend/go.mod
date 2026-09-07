@@ -10,6 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/swaggo/http-swagger v1.3.4
 	golang.org/x/crypto v0.41.0
+	golang.org/x/net v0.43.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.35.2
 )
@@ -32,7 +33,6 @@ require (
 	github.com/swaggo/swag v1.8.1 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect

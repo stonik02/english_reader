@@ -13,6 +13,7 @@ import {
 } from '../features/library/useCatalogBooks'
 import { bookStatusPresentation } from '../features/library/bookStatus'
 import { UploadBookDialog } from '../features/library/UploadBookDialog'
+import { useAuth } from '../features/auth/useAuth'
 
 type LibraryPageProps = { kind: 'catalog' | 'my-library' }
 
@@ -21,6 +22,7 @@ export function LibraryPage({ kind }: LibraryPageProps) {
 }
 
 function CatalogPage() {
+  const { user } = useAuth()
   const catalog = useCatalogBooks(true)
   const myLibrary = useMyLibraryBooks(true, 100)
   const addToMyLibrary = useAddToMyLibrary()
@@ -108,6 +110,10 @@ function CatalogPage() {
                 deleteError={
                   deleteBook.isError && deleteBook.variables === book.getId()
                 }
+                canDelete={
+                  user?.role === 'admin' ||
+                  book.getUploadedByUserId() === user?.id
+                }
                 progressPercent={progressByBookID.get(book.getId())}
                 key={book.getId()}
                 onAdd={() => addBook(book.getId())}
@@ -137,6 +143,7 @@ function CatalogPage() {
 export function BookCard({
   added,
   book,
+  canDelete,
   isAdding,
   deleteError,
   isDeleting,
@@ -146,6 +153,7 @@ export function BookCard({
 }: {
   added: boolean
   book: Book
+  canDelete: boolean
   isAdding: boolean
   deleteError: boolean
   isDeleting: boolean
@@ -196,14 +204,16 @@ export function BookCard({
           >
             {added ? 'В моей библиотеке' : isAdding ? 'Добавляем…' : 'Добавить'}
           </button>
-          <button
-            className="button button-danger"
-            disabled={isDeleting}
-            onClick={onDelete}
-            type="button"
-          >
-            {isDeleting ? 'Удаляем…' : 'Удалить книгу'}
-          </button>
+          {canDelete && (
+            <button
+              className="button button-danger"
+              disabled={isDeleting}
+              onClick={onDelete}
+              type="button"
+            >
+              {isDeleting ? 'Удаляем…' : 'Удалить книгу'}
+            </button>
+          )}
           {deleteError && (
             <span className="book-delete-error" role="alert">
               Не удалось удалить книгу. Повторите попытку.

@@ -4,7 +4,6 @@ import {
   type RefObject,
   memo,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -19,8 +18,9 @@ import {
   useSaveReadingProgress,
   useUpdateReaderSettings,
 } from '../features/reader/useReader'
+import { getAdjacentChapter } from '../api/reader'
 import { contextWindow } from '../features/reader/contextWindow'
-import { decorateInteractiveWords } from '../features/reader/decorateInteractiveWords'
+import { decorateInteractiveWordsInBatches } from '../features/reader/decorateInteractiveWords'
 import {
   useDictionaryLookup,
   useTextTranslation,
@@ -61,6 +61,7 @@ export function ReaderPage() {
   const selectedFragment = useRef('')
   const revisionRef = useRef(0)
   const chapterNavigationRef = useRef(false)
+  const prefetchedChapters = useRef(new Map<string, Chapter>())
   const saveProgressRef = useRef(saveProgress.mutate)
   const saveProgressPendingRef = useRef(saveProgress.isPending)
   const highlights = useHighlights(bookId, chapter?.getId())
@@ -103,10 +104,9 @@ export function ReaderPage() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [dictionary.data, selection])
 
-  // React can restore the original EPUB HTML after an unrelated state update.
-  // Watch for that specific DOM replacement instead of walking a whole chapter
-  // on every render: EPUB chapters can contain thousands of words.
-  useLayoutEffect(() => {
+  // The article becomes visible first. Word wrappers are then created in small
+  // batches, so their hover feedback never delays opening a chapter.
+  useEffect(() => {
     const root = chapterContent.current
     if (!root) return
     const highlightTokens =
@@ -120,22 +120,26 @@ export function ReaderPage() {
         }
       }) ?? []
 
-    const observer = new MutationObserver(() => restoreEnhancements())
-    const restoreEnhancements = () => {
-      observer.disconnect()
-      decorateInteractiveWords(root)
-      applyHighlights(root, highlightTokens)
-      observer.observe(root, { childList: true, subtree: true })
-    }
-    restoreEnhancements()
-
-    return () => observer.disconnect()
+    applyHighlights(root, highlightColor === 'none' ? [] : highlightTokens)
+    return decorateInteractiveWordsInBatches(root)
   }, [chapter, highlights.data, highlightColor])
 
-  useLayoutEffect(() => {
-    if (!chapterNavigationRef.current) return
-    window.scrollTo({ top: 0 })
-  }, [chapter])
+  useEffect(() => {
+    if (!bookId || !chapter) return
+    const key = adjacentChapterKey(bookId, chapter.getId(), 1)
+    if (prefetchedChapters.current.has(key)) return
+    let cancelled = false
+    void getAdjacentChapter(bookId, chapter.getId(), 1)
+      .then((nextChapter) => {
+        if (!cancelled) prefetchedChapters.current.set(key, nextChapter)
+      })
+      // Reaching the final chapter is expected; the normal navigation request
+      // will still show its server error if the reader presses the button.
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [bookId, chapter])
 
   function saveSettings() {
     updateSettings.mutate({ fontScale, theme, lineHeight, highlightColor })
@@ -196,26 +200,37 @@ export function ReaderPage() {
 
   function changeChapter(direction: -1 | 1) {
     if (!bookId || !chapter) return
+    const key = adjacentChapterKey(bookId, chapter.getId(), direction)
+    const cachedChapter = prefetchedChapters.current.get(key)
+    if (cachedChapter) {
+      prefetchedChapters.current.delete(key)
+      applyChapter(cachedChapter)
+      return
+    }
     adjacent.mutate(
       { bookId, chapterId: chapter.getId(), direction },
       {
         onSuccess: (nextChapter) => {
-          chapterNavigationRef.current = true
-          window.scrollTo({ top: 0 })
-          setChapter(nextChapter)
-          const currentProgress = state.data?.getProgress()
-          saveProgress.mutate(
-            {
-              bookId,
-              chapterId: nextChapter.getId(),
-              epubCfi: nextChapter.getStartCfi(),
-              progressPercent: currentProgress?.getProgressPercent() ?? 0,
-              revision: revision + 1,
-            },
-            { onSuccess: (saved) => setRevision(saved.getRevision()) },
-          )
+          applyChapter(nextChapter)
         },
       },
+    )
+  }
+
+  function applyChapter(nextChapter: Chapter) {
+    chapterNavigationRef.current = true
+    window.scrollTo({ top: 0 })
+    setChapter(nextChapter)
+    const currentProgress = state.data?.getProgress()
+    saveProgress.mutate(
+      {
+        bookId: bookId ?? '',
+        chapterId: nextChapter.getId(),
+        epubCfi: nextChapter.getStartCfi(),
+        progressPercent: currentProgress?.getProgressPercent() ?? 0,
+        revision: revision + 1,
+      },
+      { onSuccess: (saved) => setRevision(saved.getRevision()) },
     )
   }
 
@@ -254,7 +269,12 @@ export function ReaderPage() {
     translation.reset()
     const context = contextWindow(word, text)
     const fullSentence = sentenceFor(word, text)
-    setSelection({ word, translationText: context, fullSentence, translationKind: 'context' })
+    setSelection({
+      word,
+      translationText: context,
+      fullSentence,
+      translationKind: 'context',
+    })
     lookUp(word)
     if (bookId && chapter) {
       translation.mutate({ bookId, chapterId: chapter.getId(), text: context })
@@ -262,15 +282,16 @@ export function ReaderPage() {
   }
 
   function handleChapterPointerUp(event: PointerEvent<HTMLElement>) {
-    const target = event.target as Element
     window.setTimeout(() => {
       const browserSelection = window.getSelection()
       const range = browserSelection?.rangeCount
         ? browserSelection.getRangeAt(0)
         : null
-      const text = browserSelection?.toString().trim().replace(/\s+/g, ' ') ?? ''
+      const text =
+        browserSelection?.toString().trim().replace(/\s+/g, ' ') ?? ''
       const isFromChapter = Boolean(
-        range && chapterContent.current?.contains(range.commonAncestorContainer),
+        range &&
+        chapterContent.current?.contains(range.commonAncestorContainer),
       )
       const wordCount = text.match(/[\p{L}]+(?:['’][\p{L}]+)*/gu)?.length ?? 0
       if (isFromChapter && wordCount >= 2) {
@@ -283,12 +304,16 @@ export function ReaderPage() {
 
       selectedFragment.current = ''
       if (fragmentButton.current) fragmentButton.current.hidden = true
-      const word = target.closest<HTMLElement>('[data-reader-word]')
-      if (!word || !chapterContent.current?.contains(word)) return
+      const word = wordAtPoint(
+        chapterContent.current,
+        event.clientX,
+        event.clientY,
+      )
+      if (!word) return
       // A short tap can cause mobile browsers to select the word. It is still
       // a word lookup, not a request to translate a phrase.
       browserSelection?.removeAllRanges()
-      openWord(word.dataset.readerWord ?? '', selectionContainerText(word))
+      openWord(word.value, selectionContainerText(word.node))
     }, 0)
   }
 
@@ -328,6 +353,13 @@ export function ReaderPage() {
         ? state.error.message
         : 'Не удалось открыть книгу.'
     return <ReaderStatus error={message} retry={() => void state.refetch()} />
+  }
+  // The server returns the first chapter in the reading-state response. It is
+  // copied into local state in an effect so chapter navigation can replace it.
+  // Do not flash an empty-book error in the render between that response and
+  // the effect running.
+  if (!chapter && state.data?.getChapter()) {
+    return <ReaderStatus>Подготавливаем главу…</ReaderStatus>
   }
   if (!chapter) return <ReaderStatus>В книге нет доступных глав.</ReaderStatus>
   const progress = Math.round(progressPercent)
@@ -391,6 +423,8 @@ export function ReaderPage() {
               ['pink', 'Розовый'],
               ['orange', 'Оранжевый'],
               ['purple', 'Фиолетовый'],
+              ['gray-outline', 'Серый контур'],
+              ['none', 'Не выделять'],
             ].map(([value, label]) => (
               <label key={value}>
                 <input
@@ -548,7 +582,9 @@ export function ReaderPage() {
                     <p>Слово уже в вашем словаре.</p>
                   ) : (
                     <button
-                      className="button button-secondary"
+                      aria-label="Добавить в мой словарь"
+                      className="vocabulary-add-button"
+                      data-tooltip="Добавить в мой словарь"
                       type="button"
                       disabled={
                         saveVocabulary.isPending ||
@@ -556,9 +592,14 @@ export function ReaderPage() {
                       }
                       onClick={saveSelectedWord}
                     >
-                      {saveVocabulary.isPending
-                        ? 'Добавляем…'
-                        : 'В мой словарь'}
+                      {saveVocabulary.isPending ? (
+                        <span aria-hidden="true">…</span>
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="vocabulary-add-icon"
+                        />
+                      )}
                     </button>
                   )}
                   {saveVocabulary.isError && (
@@ -606,9 +647,7 @@ export function ReaderPage() {
                   fragmentTranslation.data
                     ?.getSentenceTranslation()
                     ?.getProviderError()) && (
-                  <p className="reader-error">
-                    Перевод временно недоступен.
-                  </p>
+                  <p className="reader-error">Перевод временно недоступен.</p>
                 )}
               </div>
               <button
@@ -705,6 +744,7 @@ const ChapterArticle = memo(function ChapterArticle({
           '--vocabulary-highlight-color': `var(--highlight-${highlightColor})`,
         } as CSSProperties
       }
+      data-highlight-style={highlightColor}
       dangerouslySetInnerHTML={{ __html: html }}
       onPointerUp={(event) => onPointerUpRef.current(event)}
     />
@@ -785,6 +825,53 @@ function escapeRegExp(value: string) {
 function selectionContainerText(element: Element) {
   return element?.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote')
     ?.textContent
+}
+
+const wordExpression = /[\p{L}]+(?:['’][\p{L}]+)*/gu
+
+function wordAtPoint(root: HTMLElement | null, x: number, y: number) {
+  if (!root) return null
+  const range = caretRangeAtPoint(x, y)
+  const node = range?.startContainer
+  if (!node || node.nodeType !== Node.TEXT_NODE) return null
+  const textNode = node as Text
+  const element = textNode.parentElement
+  if (
+    !element ||
+    !root.contains(element) ||
+    element.closest('script, style, pre, code')
+  ) {
+    return null
+  }
+  const offset = range?.startOffset ?? 0
+  for (const match of textNode.data.matchAll(wordExpression)) {
+    const start = match.index ?? 0
+    const end = start + match[0].length
+    if (offset >= start && offset <= end) {
+      return { value: match[0], node: element }
+    }
+  }
+  return null
+}
+
+function caretRangeAtPoint(x: number, y: number) {
+  if (typeof document.caretRangeFromPoint === 'function') {
+    return document.caretRangeFromPoint(x, y)
+  }
+  const position = document.caretPositionFromPoint?.(x, y)
+  if (!position) return null
+  const range = document.createRange()
+  range.setStart(position.offsetNode, position.offset)
+  range.collapse(true)
+  return range
+}
+
+function adjacentChapterKey(
+  bookId: string,
+  chapterId: string,
+  direction: -1 | 1,
+) {
+  return `${bookId}:${chapterId}:${direction}`
 }
 
 function sentenceFor(word: string, text: string | null | undefined) {
