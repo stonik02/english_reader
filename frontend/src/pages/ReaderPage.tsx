@@ -657,35 +657,54 @@ export function ReaderPage() {
                 <>
                   <h3>{dictionary.data.getNormalizedLemma()}</h3>
                   {(() => {
-                    const americanPronunciations = dictionary.data
-                      .getPronunciationsList()
-                      .filter((pronunciation) => {
-                        const accents = pronunciation
-                          .getAccent()
-                          .toLowerCase()
-                          .split(',')
-                          .map((accent) => accent.trim())
-                        return (
-                          accents.includes('us') ||
-                          accents.includes('general-american')
-                        )
-                      })
+                    const pronunciations =
+                      dictionary.data.getPronunciationsList()
+                    const isAmerican = (accent: string) => {
+                      const accents = accent
+                        .toLowerCase()
+                        .split(',')
+                        .map((value) => value.trim())
+                      return (
+                        accents.includes('us') ||
+                        accents.includes('general-american')
+                      )
+                    }
+                    const priority = (accent: string) => {
+                      const normalized = accent.toLowerCase()
+                      if (normalized === 'general-american') return 0
+                      if (normalized === 'us') return 1
+                      if (normalized.includes('general-american')) return 2
+                      return 3
+                    }
+                    const americanPronunciations = pronunciations
+                      .filter((pronunciation) =>
+                        isAmerican(pronunciation.getAccent()),
+                      )
                       .sort((left, right) => {
-                        const priority = (accent: string) => {
-                          const normalized = accent.toLowerCase()
-                          if (normalized === 'general-american') return 0
-                          if (normalized === 'us') return 1
-                          if (normalized.includes('general-american')) return 2
-                          return 3
-                        }
                         return (
                           priority(left.getAccent()) -
                           priority(right.getAccent())
                         )
                       })
-                    const ipa = americanPronunciations
+                    const taggedIPA = americanPronunciations
                       .find((pronunciation) => pronunciation.getIpa())
                       ?.getIpa()
+                    const ipaBeforeAmericanAudio = pronunciations
+                      .map((pronunciation, index) => ({ pronunciation, index }))
+                      .find(
+                        ({ pronunciation }) =>
+                          pronunciation.getAudioUrl() &&
+                          isAmerican(pronunciation.getAccent()),
+                      )
+                    const ipa =
+                      taggedIPA ??
+                      (ipaBeforeAmericanAudio
+                        ? pronunciations
+                            .slice(0, ipaBeforeAmericanAudio.index)
+                            .reverse()
+                            .find((pronunciation) => pronunciation.getIpa())
+                            ?.getIpa()
+                        : undefined)
                     return ipa ? (
                       <p className="pronunciation-ipa">{ipa}</p>
                     ) : null

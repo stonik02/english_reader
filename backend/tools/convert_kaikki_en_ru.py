@@ -161,6 +161,26 @@ def source_sense(label: str, senses: list[dict[str, Any]], fallback_index: int) 
 def pronunciations(entry: dict[str, Any]) -> list[dict[str, str]]:
     result: list[dict[str, str]] = []
     seen: set[tuple[str, str, str]] = set()
+    pending_untagged_ipa = ""
+
+    def add_pronunciation(
+        ipa: str, accent: str, audio_url: str, source_url: str
+    ) -> None:
+        key = (ipa, accent, audio_url)
+        if key in seen:
+            return
+        seen.add(key)
+        result.append(
+            {
+                "ipa": ipa,
+                "accent": accent,
+                "audio_url": audio_url,
+                "source_url": source_url,
+                "attribution": "Wiktionary contributors; audio attribution is on the source file page",
+                "license": "See the source file page",
+            }
+        )
+
     for sound in entry.get("sounds", []):
         if not isinstance(sound, dict):
             continue
@@ -187,20 +207,17 @@ def pronunciations(entry: dict[str, Any]) -> list[dict[str, str]]:
             if filename
             else SOURCE_URL.format(quote(str(entry["word"]).replace(" ", "_"), safe=""))
         )
-        key = (ipa, accent, audio_url)
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(
-            {
-                "ipa": ipa,
-                "accent": accent,
-                "audio_url": audio_url,
-                "source_url": source_url,
-                "attribution": "Wiktionary contributors; audio attribution is on the source file page",
-                "license": "See the source file page",
-            }
-        )
+        add_pronunciation(ipa, accent, audio_url, source_url)
+
+        # Wiktionary frequently puts IPA and an accent-labelled audio file in
+        # consecutive `sounds` entries. Preserve that association in addition
+        # to the original records, so consumers do not have to guess whether
+        # an untagged IPA is American or British.
+        if not ipa and audio_url and accent and pending_untagged_ipa:
+            add_pronunciation(pending_untagged_ipa, accent, audio_url, source_url)
+
+        if ipa:
+            pending_untagged_ipa = ipa if not accent else ""
     return result
 
 
